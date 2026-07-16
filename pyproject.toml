@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-work-assistant"
+version = "0.1.0"
+description = "Assistente pessoal de trabalho com modelos locais via llama.cpp — to-do diário, checkpoints de sprint e standup"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "Guilherme Tavares Moreira" }]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.0",
+    "openai>=1.40",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+wa = "work_assistant.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/work_assistant"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

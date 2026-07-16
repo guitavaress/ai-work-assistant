@@ -1,0 +1,51 @@
+# Servidor de inferência llama.cpp com CUDA, otimizado para RTX 3050 Laptop 4GB.
+# Sobe com: docker compose -f docker/docker-compose.yml up -d
+# Requer GPU acessível no Docker do WSL (ver README, seção Requisitos).
+
+services:
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: wa-llm
+    restart: unless-stopped
+    gpus: all
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${WA_MODELS_DIR:-${HOME}/.ai-work-assistant/models}:/models
+    command: >
+      -m /models/Qwen3.5-4B-Q4_K_M.gguf
+      --alias qwen3.5-4b
+      --host 0.0.0.0
+      --port 8080
+      -ngl 99
+      --flash-attn on
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      -c 8192
+      --jinja
+
+  # Modo qualidade (opcional): Qwen3.5 9B com offload parcial — usa os 32GB de RAM.
+  # Sobe com: docker compose -f docker/docker-compose.yml --profile quality up -d
+  # -ngl 24 mantém ~3.5GB na GPU; -t 6 usa os P-cores do i7 13ª gen para o resto.
+  llm-quality:
+    profiles: ["quality"]
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: wa-llm-quality
+    restart: unless-stopped
+    gpus: all
+    ports:
+      - "8081:8080"
+    volumes:
+      - ${WA_MODELS_DIR:-${HOME}/.ai-work-assistant/models}:/models
+    command: >
+      -m /models/Qwen3.5-9B-Q4_K_M.gguf
+      --alias qwen3.5-9b
+      --host 0.0.0.0
+      --port 8080
+      -ngl 24
+      -t 6
+      --flash-attn on
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      -c 8192
+      --jinja

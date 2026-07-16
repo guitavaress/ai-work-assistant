@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Modelos e dados locais
+*.gguf
+models/
+*.db
+*.sqlite3
+
+# Ambiente
+.env
