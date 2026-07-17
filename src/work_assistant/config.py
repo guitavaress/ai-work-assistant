@@ -24,6 +24,14 @@ QUALITY_BASE_URL = os.environ.get("WA_QUALITY_BASE_URL", "http://localhost:8081/
 
 LLM_TIMEOUT_SECONDS = float(os.environ.get("WA_LLM_TIMEOUT", "120"))
 
+# O Qwen3.5 é um modelo "thinking": por padrão raciocina longamente antes de
+# responder, o que estoura o orçamento de tokens e trava a saída estruturada.
+# Desabilitado por padrão; WA_ENABLE_THINKING=1 reativa (só afeta texto livre —
+# a saída estruturada sempre roda sem thinking).
+ENABLE_THINKING = os.environ.get("WA_ENABLE_THINKING", "") == "1"
+
+MAX_TOKENS = int(os.environ.get("WA_MAX_TOKENS", "2048"))
+
 
 def ensure_data_dir() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)

@@ -32,7 +32,8 @@ def standup(
     user_message = (
         f"Hoje é {db.today()}.\n\n"
         f"Histórico de tarefas ({start} a hoje):\n" + "\n".join(lines) + "\n\n"
-        f"Projetos ativos:\n{context.projects_block(conn)}"
+        f"Projetos ativos:\n{context.projects_block(conn)}\n\n"
+        f"Última avaliação de checkpoint por projeto:\n{context.latest_assessments_block(conn)}"
     )
     with console.status("Preparando o standup..."):
         summary = llm.complete(llm.load_prompt("standup"), user_message, quality=True)

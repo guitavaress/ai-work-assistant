@@ -29,6 +29,17 @@ def projects_block(conn: sqlite3.Connection) -> str:
     return "\n".join(lines)
 
 
+def latest_assessments_block(conn: sqlite3.Connection) -> str:
+    """Última avaliação de checkpoint de cada projeto ativo — fonte dos impedimentos."""
+    parts = []
+    for p in db.list_projects(conn):
+        checkpoints = db.list_checkpoints(conn, p.id)
+        if checkpoints:
+            last = checkpoints[-1]
+            parts.append(f"- {p.name} ({last.created_at[:10]}): {last.assessment}")
+    return "\n".join(parts) or "Nenhum checkpoint registrado."
+
+
 def checkpoints_block(conn: sqlite3.Connection, project_id: int, limit: int = 3) -> str:
     checkpoints = db.list_checkpoints(conn, project_id)[-limit:]
     if not checkpoints:

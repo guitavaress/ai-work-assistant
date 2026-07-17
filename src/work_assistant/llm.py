@@ -45,12 +45,18 @@ def complete(
         model=model,
         messages=messages,
         temperature=0.7,
+        max_tokens=config.MAX_TOKENS,
+        extra_body={"chat_template_kwargs": {"enable_thinking": config.ENABLE_THINKING}},
     )
     return response.choices[0].message.content or ""
 
 
 def structured(system: str, user: str, schema: dict, model: str | None = None) -> dict:
-    """Chat com saída JSON garantida pelo schema (gramática no llama.cpp)."""
+    """Chat com saída JSON garantida pelo schema (gramática no llama.cpp).
+
+    Thinking sempre desligado aqui: com ele ativo o modelo gasta o orçamento
+    de tokens raciocinando e devolve o JSON vazio.
+    """
     response = client().chat.completions.create(
         model=model or config.LLM_MODEL,
         messages=[
@@ -58,9 +64,11 @@ def structured(system: str, user: str, schema: dict, model: str | None = None) -
             {"role": "user", "content": user},
         ],
         temperature=0.3,
+        max_tokens=config.MAX_TOKENS,
         response_format={
             "type": "json_schema",
             "json_schema": {"name": "resposta", "schema": schema, "strict": True},
         },
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
     )
     return json.loads(response.choices[0].message.content or "{}")

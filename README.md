@@ -102,6 +102,8 @@ Variáveis de ambiente (todas opcionais):
 | `WA_QUALITY_MODEL` | *(vazio)* | Modelo usado pelo `wa standup`, se definido |
 | `WA_QUALITY_BASE_URL` | `http://localhost:8081/v1` | Endpoint do servidor do modo qualidade |
 | `WA_LLM_TIMEOUT` | `120` | Timeout das chamadas ao modelo (s) |
+| `WA_ENABLE_THINKING` | *(desligado)* | `1` ativa o modo thinking do Qwen nas respostas de texto (mais qualidade, bem mais lento) |
+| `WA_MAX_TOKENS` | `2048` | Limite de tokens por resposta |
 
 ## Desenvolvimento
 
