@@ -80,11 +80,11 @@ O `docker-compose.yml` já vem com as flags ajustadas para 4GB de VRAM:
 | `-c 8192` | Contexto suficiente para os prompts do assistente sem estourar VRAM |
 | `--jinja` | Habilita o chat template do Qwen (tool calling / saída estruturada) |
 
-Monitore com `nvidia-smi` na primeira execução: o processo deve ficar abaixo de ~3.5GB de VRAM. Expectativa na RTX 3050: **25–40 tokens/s**.
+Monitore com `nvidia-smi` na primeira execução: medido em **3164 MiB** de VRAM (RTX 4070; o valor transfere para a 3050). Expectativa na RTX 3050: **~40 tokens/s** de geração. Benchmarks completos da matriz de configs em [docs/model-evaluation.md](docs/model-evaluation.md).
 
 ### Modo qualidade (opcional)
 
-Com 32GB de RAM dá para rodar o **Qwen3.5 9B** com offload parcial (mais lento, ~5–10 tok/s — bom para o standup, ruim para chat). Baixe com `python3 scripts/download_model.py --quality`, suba com `docker compose -f docker/docker-compose.yml --profile quality up -d` e aponte o standup para ele:
+Com 32GB de RAM dá para rodar o **Qwen3.5 9B** com offload parcial (`-ngl 18`, medido em 3490 MiB de VRAM; ~6–9 tok/s estimados na 3050 — bom para o standup, ruim para chat). Baixe com `python3 scripts/download_model.py --quality`, suba com `docker compose -f docker/docker-compose.yml --profile quality up -d` e aponte o standup para ele:
 
 ```bash
 export WA_QUALITY_MODEL=qwen3.5-9b

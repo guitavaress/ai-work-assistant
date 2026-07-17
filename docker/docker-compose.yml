@@ -26,7 +26,8 @@ services:
 
   # Modo qualidade (opcional): Qwen3.5 9B com offload parcial — usa os 32GB de RAM.
   # Sobe com: docker compose -f docker/docker-compose.yml --profile quality up -d
-  # -ngl 24 mantém ~3.5GB na GPU; -t 6 usa os P-cores do i7 13ª gen para o resto.
+  # -ngl 18 medido em 3490 MiB de VRAM (cabe nos 4096 MiB da 3050 com margem;
+  # -ngl 24 estourava: 4280 MiB). -t 6 usa os P-cores do i7 13ª gen para o resto.
   llm-quality:
     profiles: ["quality"]
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
@@ -42,7 +43,7 @@ services:
       --alias qwen3.5-9b
       --host 0.0.0.0
       --port 8080
-      -ngl 24
+      -ngl 18
       -t 6
       --flash-attn on
       --cache-type-k q8_0
