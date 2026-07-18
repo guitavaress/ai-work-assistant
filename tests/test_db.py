@@ -28,6 +28,14 @@ def test_complete_task(conn):
     assert pendentes == []
 
 
+def test_reopen_task(conn):
+    task = db.add_task(conn, "Voltar atrás")
+    db.complete_task(conn, task.id)
+    reopened = db.reopen_task(conn, task.id)
+    assert reopened.status == "pending"
+    assert reopened.done_at is None
+
+
 def test_complete_missing_task_raises(conn):
     with pytest.raises(LookupError):
         db.complete_task(conn, 999)
@@ -73,3 +81,45 @@ def test_checkpoints(conn):
 
     with pytest.raises(LookupError):
         db.add_checkpoint(conn, 999, "x", "y")
+
+
+def test_checkpoint_status_and_summary(conn):
+    p = db.add_project(conn, "API v2", "Publicar a API v2 com autenticação")
+    cp = db.add_checkpoint(
+        conn, p.id, "relato", "avaliação", status="em risco", summary="Em risco — auth parada."
+    )
+    assert cp.status == "em risco"
+    assert cp.summary == "Em risco — auth parada."
+
+
+def test_migration_adds_checkpoint_columns(tmp_path):
+    """Banco criado com o schema antigo (sem status/summary) ganha as colunas no connect()."""
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.executescript(
+        """
+        CREATE TABLE projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE,
+            goal TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL
+        );
+        CREATE TABLE checkpoints (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id),
+            progress TEXT NOT NULL, assessment TEXT NOT NULL, created_at TEXT NOT NULL
+        );
+        INSERT INTO projects (name, goal, created_at) VALUES ('X', 'meta', '2026-01-01');
+        INSERT INTO checkpoints (project_id, progress, assessment, created_at)
+            VALUES (1, 'antigo', 'ok', '2026-01-01');
+        """
+    )
+    old.commit()
+    old.close()
+
+    conn = db.connect(path)
+    cps = db.list_checkpoints(conn, 1)
+    assert cps[0].status is None
+    assert cps[0].summary is None
+    db.add_checkpoint(conn, 1, "novo", "ok", status="no rumo", summary="No rumo.")
+    assert db.list_checkpoints(conn, 1)[-1].status == "no rumo"

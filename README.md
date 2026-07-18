@@ -68,6 +68,22 @@ wa checkpoint "API v2"           # 1–2x por semana: check-in de progresso
 wa standup                       # antes da daily: resumo pronto para falar
 ```
 
+## Interface web
+
+Além da CLI, o assistente tem uma interface web local — mesmos dados (SQLite) e mesmo servidor de modelo:
+
+```bash
+wa web            # sobe em http://127.0.0.1:8765 e abre o navegador
+wa web --no-browser
+```
+
+- **Hoje** — saudação, to-do do dia (adicionar e concluir com um clique) e o botão "Planejar o dia", que transforma seu relato em um to-do priorizado pelo modelo.
+- **Projetos** — cards com objetivo, tag de situação (`no rumo` / `em risco`) derivada do último checkpoint e timeline de check-ins.
+- **Chat** — conversa com o contexto das suas tarefas e projetos.
+- **Histórico** — navegação pelos to-dos de dias anteriores.
+- Checkpoint e standup abrem em modais com a avaliação em blocos (Situação/Riscos/Próximo passo e Ontem/Hoje/Impedimentos, com botão de copiar).
+- Tema claro/escuro (persistido no navegador) e indicador de status do servidor llama.cpp no topo — ações de modelo avisam quando o servidor está fora do ar.
+
 ## Otimização para RTX 3050 4GB
 
 O `docker-compose.yml` já vem com as flags ajustadas para 4GB de VRAM:
@@ -104,6 +120,9 @@ Variáveis de ambiente (todas opcionais):
 | `WA_LLM_TIMEOUT` | `120` | Timeout das chamadas ao modelo (s) |
 | `WA_ENABLE_THINKING` | *(desligado)* | `1` ativa o modo thinking do Qwen nas respostas de texto (mais qualidade, bem mais lento) |
 | `WA_MAX_TOKENS` | `2048` | Limite de tokens por resposta |
+| `WA_WEB_HOST` | `127.0.0.1` | Host da interface web (`wa web`) |
+| `WA_WEB_PORT` | `8765` | Porta da interface web |
+| `WA_USER_NAME` | *(vazio)* | Nome usado na saudação da interface web |
 
 ## Desenvolvimento
 

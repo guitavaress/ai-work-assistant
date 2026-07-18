@@ -4,7 +4,7 @@ import typer
 from rich.console import Console
 from rich.markdown import Markdown
 
-from work_assistant import context, db, llm
+from work_assistant import db, services
 
 app = typer.Typer()
 console = Console()
@@ -36,16 +36,9 @@ def checkpoint(
     console.print(f"[dim]Objetivo: {project.goal}[/dim]\n")
     progress = typer.prompt("Como está o progresso? (o que avançou, o que travou, o que falta)")
 
-    user_message = (
-        f"Projeto: {project.name}\n"
-        f"Objetivo da entrega: {project.goal}\n\n"
-        f"Checkpoints anteriores:\n{context.checkpoints_block(conn, project.id)}\n\n"
-        f"Relato de hoje:\n{progress}"
-    )
     with console.status("Avaliando progresso..."):
-        assessment = llm.complete(llm.load_prompt("checkpoint"), user_message)
+        result = services.run_checkpoint(conn, project, progress)
 
-    db.add_checkpoint(conn, project.id, progress, assessment)
     console.print()
-    console.print(Markdown(assessment))
+    console.print(Markdown(result["markdown"]))
     console.print("\n[dim]Checkpoint salvo.[/dim]")

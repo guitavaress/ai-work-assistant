@@ -32,9 +32,19 @@ CREATE TABLE IF NOT EXISTS checkpoints (
     project_id INTEGER NOT NULL REFERENCES projects(id),
     progress TEXT NOT NULL,    -- o que o usuário relatou
     assessment TEXT NOT NULL,  -- avaliação gerada pelo modelo
+    status TEXT,               -- no rumo | em risco | desviando (NULL em registros antigos)
+    summary TEXT,              -- resumo de 1 frase para a timeline da interface web
     created_at TEXT NOT NULL
 );
 """
+
+# Colunas adicionadas depois do schema inicial: bancos existentes precisam de ALTER.
+_MIGRATIONS = {
+    "checkpoints": {
+        "status": "ALTER TABLE checkpoints ADD COLUMN status TEXT",
+        "summary": "ALTER TABLE checkpoints ADD COLUMN summary TEXT",
+    }
+}
 
 
 @dataclass
@@ -64,6 +74,8 @@ class Checkpoint:
     project_id: int
     progress: str
     assessment: str
+    status: str | None
+    summary: str | None
     created_at: str
 
 
@@ -73,7 +85,17 @@ def connect(db_path: Path | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    _migrate(conn)
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    for table, columns in _MIGRATIONS.items():
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for column, ddl in columns.items():
+            if column not in existing:
+                conn.execute(ddl)
+    conn.commit()
 
 
 def _now() -> str:
@@ -138,6 +160,15 @@ def complete_task(conn: sqlite3.Connection, task_id: int) -> Task:
     return get_task(conn, task_id)
 
 
+def reopen_task(conn: sqlite3.Connection, task_id: int) -> Task:
+    get_task(conn, task_id)
+    conn.execute(
+        "UPDATE tasks SET status = 'pending', done_at = NULL WHERE id = ?", (task_id,)
+    )
+    conn.commit()
+    return get_task(conn, task_id)
+
+
 def set_task_priority(conn: sqlite3.Connection, task_id: int, priority: int) -> Task:
     get_task(conn, task_id)
     conn.execute("UPDATE tasks SET priority = ? WHERE id = ?", (priority, task_id))
@@ -195,12 +226,18 @@ def complete_project(conn: sqlite3.Connection, project_id: int) -> Project:
 
 
 def add_checkpoint(
-    conn: sqlite3.Connection, project_id: int, progress: str, assessment: str
+    conn: sqlite3.Connection,
+    project_id: int,
+    progress: str,
+    assessment: str,
+    status: str | None = None,
+    summary: str | None = None,
 ) -> Checkpoint:
     get_project(conn, project_id)
     cur = conn.execute(
-        "INSERT INTO checkpoints (project_id, progress, assessment, created_at) VALUES (?, ?, ?, ?)",
-        (project_id, progress, assessment, _now()),
+        "INSERT INTO checkpoints (project_id, progress, assessment, status, summary, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (project_id, progress, assessment, status, summary, _now()),
     )
     conn.commit()
     row = conn.execute("SELECT * FROM checkpoints WHERE id = ?", (cur.lastrowid,)).fetchone()

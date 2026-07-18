@@ -2,7 +2,7 @@
 
 import typer
 
-from work_assistant.commands import chat, checkpoint, plan, project, standup, todo
+from work_assistant.commands import chat, checkpoint, plan, project, standup, todo, web
 
 app = typer.Typer(
     help="Assistente pessoal de trabalho com modelo local (llama.cpp).",
@@ -15,6 +15,7 @@ app.add_typer(plan.app, name="plan", help="Monta o to-do do dia com ajuda do mod
 app.add_typer(checkpoint.app, name="checkpoint", help="Check-in de progresso de um projeto.")
 app.add_typer(standup.app, name="standup", help="Gera a fala da daily a partir do histórico.")
 app.add_typer(chat.app, name="chat", help="Conversa livre com contexto das suas tarefas.")
+app.add_typer(web.app, name="web", help="Abre a interface web local do assistente.")
 
 
 if __name__ == "__main__":
