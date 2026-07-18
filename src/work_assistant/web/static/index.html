@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wa_ — assistente de trabalho</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232E6B4F'/%3E%3Ctext x='24' y='45' font-family='ui-monospace,Menlo,Consolas,monospace' font-size='30' font-weight='600' fill='%23FFFFFF' text-anchor='middle'%3Ewa%3C/text%3E%3Crect x='44' y='39' width='12' height='6' rx='2' fill='%23A8D5BC'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body {
+  margin: 0; font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  background: var(--bg); color: var(--ink);
+  --bg:#F7F5F0; --card:#FFFFFF; --border:#E5E1D8; --line:#F0EDE5; --ink:#1C1B18;
+  --dim:#6E6A5F; --faint:#B9B4A6; --accent:#2E6B4F; --accent-ink:#FFFFFF;
+  --accent-soft:#EDF3EE; --accent-border:#CFE0D4; --accent-text:#2A4A3A;
+  --chip:#EFECE3; --p1bg:#F6E8DE; --p1ink:#8A4B2D; --btn:#F3F0E9;
+  --ok:#3E9B6B; --warn:#C2542E; --overlay:rgba(20,19,16,0.45); --shadow:rgba(28,27,24,0.08);
+}
+body.dark {
+  --bg:#171612; --card:#201E19; --border:#34312A; --line:#2A2822; --ink:#F0EDE5;
+  --dim:#A8A296; --faint:#6E6A5F; --accent:#4E9C74; --accent-ink:#0E1F17;
+  --accent-soft:#1E2A23; --accent-border:#2E4A3B; --accent-text:#A8D5BC;
+  --chip:#2A2822; --p1bg:#3A2417; --p1ink:#E5A583; --btn:#262420;
+  --ok:#4FBF85; --warn:#E07B52; --overlay:rgba(0,0,0,0.55); --shadow:rgba(0,0,0,0.35);
+}
+a { color: var(--accent); } a:hover { opacity: 0.8; }
+input, textarea, button { font-family: inherit; }
+input::placeholder, textarea::placeholder { color: var(--faint); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--bg); z-index: 10;
+}
+.topbar-left { display: flex; align-items: center; gap: 28px; }
+.brand { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 16px; }
+.brand span { color: var(--accent); }
+.nav { display: flex; gap: 4px; }
+.nav button {
+  border: none; background: transparent; color: var(--dim); font-weight: 500;
+  border-radius: 8px; padding: 7px 14px; font-size: 14px; cursor: pointer;
+}
+.nav button.active { background: var(--chip); color: var(--ink); font-weight: 600; }
+.topbar-right { display: flex; align-items: center; gap: 14px; }
+.server { display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); }
+.server .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; }
+.server.off .dot { background: var(--warn); }
+.icon-btn {
+  border: 1px solid var(--border); background: var(--card); color: var(--dim);
+  border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 14px;
+}
+
+.container { flex: 1; width: 100%; max-width: 680px; margin: 0 auto; padding: 44px 24px 72px; box-sizing: border-box; }
+.view { display: none; }
+.view.active { display: block; }
+.stack { display: flex; flex-direction: column; gap: 26px; }
+.stack-md { display: flex; flex-direction: column; gap: 22px; }
+.kicker { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--dim); }
+.h1 { font-size: 34px; font-weight: 600; letter-spacing: -0.5px; margin-top: 4px; }
+.h2 { font-size: 30px; font-weight: 600; letter-spacing: -0.4px; margin-top: 2px; }
+
+.banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  background: var(--accent-soft); border: 1px solid var(--accent-border);
+  border-radius: 12px; padding: 16px 20px;
+}
+.banner div { font-size: 15px; color: var(--accent-text); }
+
+.btn-primary {
+  background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px;
+  padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.btn {
+  border: 1px solid var(--border); background: var(--btn); color: var(--ink);
+  border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+}
+.btn-plain { border: none; background: transparent; color: var(--dim); font-size: 13px; cursor: pointer; }
+.btn-link { border: none; background: transparent; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; }
+.card-list { padding: 8px 0; }
+.card-pad { padding: 18px 22px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 22px 10px; }
+.card-title { font-size: 16px; font-weight: 600; }
+.card-count { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); }
+
+.task-row { display: flex; align-items: center; gap: 14px; padding: 13px 22px; border-top: 1px solid var(--line); }
+.task-row.done { opacity: 0.55; }
+.checkbox {
+  width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; cursor: pointer;
+  border: 2px solid var(--faint); background: transparent; color: var(--accent-ink);
+  display: flex; align-items: center; justify-content: center; font-size: 13px; box-sizing: border-box;
+}
+.checkbox.checked { border-color: var(--accent); background: var(--accent); }
+.checkbox.static { cursor: default; }
+.prio {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+  color: var(--dim); background: var(--chip); padding: 2px 7px; border-radius: 5px;
+}
+.prio.p1 { color: var(--p1ink); background: var(--p1bg); }
+.task-title { font-size: 15px; flex: 1; }
+.task-title.done { text-decoration: line-through; }
+.add-row { padding: 12px 22px; border-top: 1px solid var(--line); }
+.add-row input { width: 100%; border: none; background: transparent; font-size: 15px; color: var(--ink); outline: none; box-sizing: border-box; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.mini-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.mini-title { font-size: 14px; font-weight: 600; }
+.chip-col { display: flex; flex-direction: column; gap: 10px; }
+.chip-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.chip-row span:first-child { font-size: 14px; }
+.tag {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim);
+  background: var(--chip); padding: 2px 7px; border-radius: 5px; white-space: nowrap;
+}
+.tag.ok { color: var(--accent); background: var(--accent-soft); }
+.tag.risk { color: var(--warn); background: var(--p1bg); }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.proj-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; }
+.proj-card.done { opacity: 0.55; }
+.proj-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.proj-name { font-size: 18px; font-weight: 600; }
+.proj-goal { font-size: 14px; color: var(--dim); margin-top: 4px; }
+.proj-actions { display: flex; gap: 8px; margin-top: 16px; }
+.timeline { margin-top: 18px; display: flex; flex-direction: column; }
+.tl-item { display: flex; gap: 12px; }
+.tl-rail { display: flex; flex-direction: column; align-items: center; }
+.tl-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); margin-top: 4px; flex-shrink: 0; }
+.tl-dot.last { background: var(--accent); }
+.tl-line { width: 1.5px; flex: 1; background: var(--border); }
+.tl-line.end { background: transparent; }
+.tl-body { padding-bottom: 16px; }
+.tl-body.end { padding-bottom: 0; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--faint); }
+.tl-summary { font-size: 13.5px; color: var(--dim); margin-top: 2px; max-width: 520px; }
+.np-form { background: var(--card); border: 1px solid var(--accent-border); border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+.np-form input {
+  border: 1px solid var(--border); background: var(--bg); color: var(--ink);
+  border-radius: 8px; padding: 10px 14px; font-size: 14px; outline: none; box-sizing: border-box;
+}
+.np-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+.chat-wrap { display: flex; flex-direction: column; gap: 18px; min-height: 60vh; }
+.chat-msgs { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+.chat-empty { color: var(--faint); font-size: 14px; padding: 24px 0; }
+.bubble { max-width: 78%; padding: 12px 16px; font-size: 14.5px; line-height: 1.55; white-space: pre-wrap; }
+.bubble.user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 14px 14px 4px 14px; }
+.bubble.bot { align-self: flex-start; background: var(--card); color: var(--ink); border: 1px solid var(--border); border-radius: 14px 14px 14px 4px; }
+.thinking { align-self: flex-start; display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 13px; padding: 6px 2px; }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--chip); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite; }
+.spinner.lg { width: 18px; height: 18px; border-width: 2.5px; }
+.chat-input { display: flex; gap: 10px; position: sticky; bottom: 24px; }
+.chat-input input {
+  flex: 1; border: 1px solid var(--border); background: var(--card); color: var(--ink);
+  border-radius: 10px; padding: 13px 16px; font-size: 14.5px; outline: none;
+  box-shadow: 0 6px 18px var(--shadow); box-sizing: border-box;
+}
+.chat-input button { background: var(--accent); color: var(--accent-ink); border: none; border-radius: 10px; padding: 0 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+.hist-nav { display: flex; align-items: center; gap: 10px; }
+.hist-nav .label { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--ink); min-width: 220px; text-align: center; }
+.hist-empty { color: var(--faint); font-size: 14px; padding: 22px; }
+
+.overlay { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 24px; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; width: 560px; max-width: 100%; padding: 28px 30px; box-shadow: 0 24px 60px var(--shadow); }
+.modal-title { font-size: 22px; font-weight: 600; }
+.modal-sub { font-size: 14px; color: var(--dim); margin-top: 4px; }
+.modal textarea {
+  width: 100%; margin-top: 16px; border: 1px solid var(--border); background: var(--bg);
+  color: var(--ink); border-radius: 10px; padding: 12px 14px; font-size: 14.5px;
+  line-height: 1.5; outline: none; resize: vertical; box-sizing: border-box;
+}
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; align-items: center; }
+.modal-actions .btn-plain, .modal-actions .btn { font-size: 14px; }
+.wait { display: flex; align-items: center; gap: 12px; padding: 18px 4px; }
+.wait span:last-child { font-size: 15px; color: var(--dim); }
+.suggest-list { display: flex; flex-direction: column; margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.suggest-item { display: flex; gap: 12px; align-items: center; padding: 11px 16px; border-top: 1px solid var(--line); margin-top: -1px; }
+.suggest-item .num { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--accent); width: 18px; }
+.suggest-item .txt { font-size: 14.5px; }
+.pick-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.pick-list button { text-align: left; border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 10px; padding: 13px 16px; font-size: 14.5px; cursor: pointer; }
+.pick-list .p-name { font-weight: 600; }
+.pick-list .p-goal { color: var(--dim); font-size: 13px; display: block; margin-top: 2px; }
+.blocks { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.block-title { font-size: 13px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.4px; }
+.block-body { font-size: 14.5px; line-height: 1.55; color: var(--ink); margin-top: 4px; white-space: pre-line; }
+.modal-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+.saved-note { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--faint); }
+
+.toast {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: var(--bg); border-radius: 999px; padding: 11px 22px;
+  font-size: 14px; box-shadow: 0 10px 28px var(--shadow); z-index: 60; white-space: nowrap;
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="brand">wa<span>_</span></div>
+      <div class="nav" id="nav"></div>
+    </div>
+    <div class="topbar-right">
+      <div class="server" id="server" title="servidor llama.cpp local"><span class="dot"></span><span id="server-label"></span></div>
+      <button class="icon-btn" id="theme-btn" title="alternar tema">☾</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="view" id="view-hoje"></div>
+    <div class="view" id="view-projetos"></div>
+    <div class="view" id="view-chat"></div>
+    <div class="view" id="view-hist"></div>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+</div>
+<script>
+'use strict';
+
+// --- Estado ----------------------------------------------------------------
+const S = {
+  view: 'hoje',
+  today: null, userName: '', model: '…', online: true,
+  tasks: [], projects: [],
+  histDay: null, histTasks: [],
+  chat: [], chatThinking: false,
+  modal: null,
+  plan: { stage: 'input', text: '', suggested: [] },
+  cp: { stage: 'pick', projectId: null, text: '', blocks: [], name: '', goal: '' },
+  su: { stage: 'thinking', blocks: [], copied: false },
+  np: { open: false, name: '', goal: '' },
+};
+const OFFLINE_MSG = 'Servidor offline — suba o llama.cpp com docker compose up -d';
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+// --- Utilitários -----------------------------------------------------------
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+function fmtLong(day) {
+  const s = new Date(day + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function fmtShort(day) {
+  const d = new Date(day + 'T12:00:00');
+  return String(d.getDate()).padStart(2, '0') + ' ' + MESES[d.getMonth()];
+}
+function shiftDay(day, n) {
+  const d = new Date(day + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function greeting() {
+  const h = new Date().getHours();
+  const g = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+  return S.userName ? g + ', ' + S.userName : g;
+}
+let toastTimer = null;
+function toast(msg) {
+  document.getElementById('toast-root').innerHTML = '<div class="toast">' + esc(msg) + '</div>';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { document.getElementById('toast-root').innerHTML = ''; }, 3200);
+}
+function guardLLM() {
+  if (!S.online) { toast(OFFLINE_MSG); return false; }
+  return true;
+}
+
+// --- API -------------------------------------------------------------------
+async function api(path, body) {
+  const opts = body === undefined ? {} : {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  };
+  const r = await fetch(path, opts);
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    throw new Error(data.detail || 'Erro inesperado ao falar com o assistente.');
+  }
+  return r.json();
+}
+async function loadState() {
+  const st = await api('/api/state');
+  S.today = st.today;
+  S.userName = st.user_name;
+  S.model = st.model;
+  S.tasks = st.tasks;
+  S.projects = st.projects;
+  if (!S.histDay) S.histDay = st.today;
+  render();
+}
+async function loadHist() {
+  const st = await api('/api/state?day=' + S.histDay);
+  S.histTasks = st.tasks;
+  render();
+}
+async function checkHealth() {
+  try {
+    const h = await api('/api/health');
+    S.online = h.online;
+    S.model = h.model;
+  } catch (e) {
+    S.online = false;
+  }
+  renderServer();
+}
+
+// --- Tema ------------------------------------------------------------------
+function applyTheme(t) {
+  document.body.classList.toggle('dark', t === 'dark');
+  document.getElementById('theme-btn').textContent = t === 'dark' ? '☀' : '☾';
+  try { localStorage.setItem('wa-theme', t); } catch (e) {}
+}
+document.getElementById('theme-btn').onclick = () =>
+  applyTheme(document.body.classList.contains('dark') ? 'light' : 'dark');
+
+// --- Render ----------------------------------------------------------------
+function render() {
+  renderNav();
+  renderServer();
+  for (const v of ['hoje', 'projetos', 'chat', 'hist']) {
+    document.getElementById('view-' + v).classList.toggle('active', S.view === v);
+  }
+  if (S.view === 'hoje') renderHoje();
+  if (S.view === 'projetos') renderProjetos();
+  if (S.view === 'chat') renderChat();
+  if (S.view === 'hist') renderHist();
+  renderModal();
+}
+function go(view) {
+  S.view = view;
+  if (view === 'hist') loadHist();
+  render();
+}
+function renderNav() {
+  const items = [['Hoje', 'hoje'], ['Projetos', 'projetos'], ['Chat', 'chat'], ['Histórico', 'hist']];
+  document.getElementById('nav').innerHTML = items.map(([label, key]) =>
+    '<button class="' + (S.view === key ? 'active' : '') + '" onclick="go(\'' + key + '\')">' + label + '</button>'
+  ).join('');
+}
+function renderServer() {
+  document.getElementById('server').classList.toggle('off', !S.online);
+  document.getElementById('server-label').textContent = S.online ? S.model : S.model + ' · offline';
+}
+function tagClass(tag) {
+  if (tag === 'no rumo') return 'tag ok';
+  if (tag === 'em risco' || tag === 'desviando') return 'tag risk';
+  return 'tag';
+}
+function taskRow(t, clickable) {
+  return '<div class="task-row' + (t.done ? ' done' : '') + '">'
+    + '<span class="checkbox' + (t.done ? ' checked' : '') + (clickable ? '' : ' static') + '"'
+    + (clickable ? ' onclick="toggleTask(' + t.id + ')"' : '') + '>' + (t.done ? '✓' : '') + '</span>'
+    + (t.priority != null
+      ? '<span class="prio' + (t.priority === 1 ? ' p1' : '') + '">P' + t.priority + '</span>' : '')
+    + '<span class="task-title' + (t.done ? ' done' : '') + '">' + esc(t.title) + '</span>'
+    + '</div>';
+}
+
+function renderHoje() {
+  const done = S.tasks.filter(t => t.done).length;
+  const active = S.projects.filter(p => p.active);
+  let html = '<div class="stack">';
+  html += '<div><div class="kicker">' + (S.today ? fmtLong(S.today) : '') + '</div>'
+    + '<div class="h1">' + esc(greeting()) + '</div></div>';
+  if (S.tasks.length === 0) {
+    html += '<div class="banner"><div>Você ainda não planejou o dia de hoje.</div>'
+      + '<button class="btn-primary" onclick="openPlan()">Planejar o dia</button></div>';
+  }
+  html += '<div class="card card-list">'
+    + '<div class="card-head"><div class="card-title">To-do de hoje</div>'
+    + '<div class="card-count">' + done + ' / ' + S.tasks.length + ' feitas</div></div>'
+    + S.tasks.map(t => taskRow(t, true)).join('')
+    + '<div class="add-row"><input id="new-task" placeholder="Adicionar tarefa…  (Enter salva)" onkeydown="addTaskKey(event)"></div>'
+    + '</div>';
+  html += '<div class="grid2">'
+    + '<div class="card card-pad"><div class="mini-head"><div class="mini-title">Projetos</div>'
+    + '<button class="btn-link" onclick="go(\'projetos\')">ver todos</button></div>'
+    + '<div class="chip-col">'
+    + (active.length
+      ? active.map(p => '<div class="chip-row"><span>' + esc(p.name) + '</span>'
+        + '<span class="' + tagClass(p.tag) + '">' + esc(p.tag) + '</span></div>').join('')
+      : '<div class="hist-empty" style="padding:0; font-size:13px;">Nenhum projeto ativo.</div>')
+    + '</div></div>'
+    + '<div class="card card-pad"><div class="mini-title" style="margin-bottom:12px;">Ações rápidas</div>'
+    + '<div class="quick">'
+    + '<button class="btn" onclick="openCheckpoint()">Checkpoint</button>'
+    + '<button class="btn" onclick="openStandup()">Standup</button>'
+    + '<button class="btn" onclick="go(\'chat\')">Chat</button>'
+    + '</div></div></div>';
+  html += '</div>';
+  document.getElementById('view-hoje').innerHTML = html;
+}
+
+function renderProjetos() {
+  let html = '<div class="stack-md">';
+  html += '<div style="display:flex; justify-content:space-between; align-items:flex-end;">'
+    + '<div><div class="kicker">entregas acompanhadas por checkpoints</div>'
+    + '<div class="h2">Projetos</div></div>'
+    + '<button class="btn" style="font-weight:600; padding:9px 16px;" onclick="toggleNp()">+ novo projeto</button></div>';
+  if (S.np.open) {
+    html += '<div class="np-form">'
+      + '<input id="np-name" placeholder="Nome curto do projeto" value="' + esc(S.np.name) + '">'
+      + '<input id="np-goal" placeholder="Objetivo da entrega (o que é \'pronto\')" value="' + esc(S.np.goal) + '">'
+      + '<div class="np-actions"><button class="btn-plain" onclick="toggleNp()">Cancelar</button>'
+      + '<button class="btn-primary" style="padding:9px 16px; font-size:13px;" onclick="saveNp()">Criar projeto</button></div></div>';
+  }
+  for (const p of S.projects) {
+    const tl = p.timeline;
+    html += '<div class="proj-card' + (p.active ? '' : ' done') + '">'
+      + '<div class="proj-head"><span class="proj-name">' + esc(p.name) + '</span>'
+      + '<span class="' + tagClass(p.tag) + '" style="padding:3px 8px;">' + esc(p.tag) + '</span></div>'
+      + '<div class="proj-goal">' + esc(p.goal) + '</div>';
+    if (tl.length) {
+      html += '<div class="timeline">' + tl.map((c, i) => {
+        const end = i === tl.length - 1;
+        return '<div class="tl-item"><div class="tl-rail">'
+          + '<span class="tl-dot' + (end ? ' last' : '') + '"></span>'
+          + '<span class="tl-line' + (end ? ' end' : '') + '"></span></div>'
+          + '<div class="tl-body' + (end ? ' end' : '') + '">'
+          + '<div class="tl-date">' + fmtShort(c.date) + ' · ' + esc(p.name) + '</div>'
+          + '<div class="tl-summary">' + esc(c.summary) + '</div></div></div>';
+      }).join('') + '</div>';
+    }
+    if (p.active) {
+      html += '<div class="proj-actions">'
+        + '<button class="btn" onclick="openCheckpointFor(' + p.id + ')">Fazer checkpoint</button>'
+        + '<button class="btn-plain" onclick="finishProject(' + p.id + ')">Concluir projeto</button></div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  document.getElementById('view-projetos').innerHTML = html;
+}
+
+function renderChat() {
+  const active = S.projects.filter(p => p.active);
+  let html = '<div class="chat-wrap">';
+  html += '<div><div class="kicker">com o contexto de ' + S.tasks.length + ' tarefas · ' + active.length + ' projetos</div>'
+    + '<div class="h2">Chat</div></div>';
+  html += '<div class="chat-msgs">';
+  if (!S.chat.length && !S.chatThinking) {
+    html += '<div class="chat-empty">Pergunte sobre priorização, quebra de tarefas ou qualidade das entregas. O modelo enxerga suas tarefas e projetos.</div>';
+  }
+  html += S.chat.map(m =>
+    '<div class="bubble ' + (m.role === 'user' ? 'user' : 'bot') + '">' + esc(m.content) + '</div>'
+  ).join('');
+  if (S.chatThinking) {
+    html += '<div class="thinking"><span class="spinner"></span>Pensando…</div>';
+  }
+  html += '</div>';
+  html += '<div class="chat-input">'
+    + '<input id="chat-text" placeholder="Escreva uma mensagem…" onkeydown="if(event.key===\'Enter\')sendChat()">'
+    + '<button onclick="sendChat()">Enviar</button></div>';
+  html += '</div>';
+  document.getElementById('view-chat').innerHTML = html;
+  const el = document.getElementById('view-chat');
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderHist() {
+  const isToday = S.histDay === S.today;
+  let html = '<div class="stack-md">';
+  html += '<div><div class="kicker">to-dos de dias anteriores</div><div class="h2">Histórico</div></div>';
+  html += '<div class="hist-nav">'
+    + '<button class="icon-btn" onclick="histShift(-1)">‹</button>'
+    + '<span class="label">' + (S.histDay ? fmtLong(S.histDay) : '') + '</span>'
+    + '<button class="icon-btn" style="color:' + (isToday ? 'var(--faint)' : 'var(--dim)') + ';" onclick="histShift(1)">›</button>'
+    + '</div>';
+  html += '<div class="card card-list">'
+    + (S.histTasks.length
+      ? S.histTasks.map(t => taskRow(t, isToday)).join('')
+      : '<div class="hist-empty">Nenhuma tarefa registrada neste dia.</div>')
+    + '</div>';
+  html += '</div>';
+  document.getElementById('view-hist').innerHTML = html;
+}
+
+// --- Ações: tarefas --------------------------------------------------------
+async function toggleTask(id) {
+  try {
+    await api('/api/tasks/' + id + '/toggle', {});
+    await loadState();
+    if (S.view === 'hist') await loadHist();
+  } catch (e) { toast(e.message); }
+}
+async function addTaskKey(ev) {
+  if (ev.key !== 'Enter') return;
+  const input = document.getElementById('new-task');
+  const title = input.value.trim();
+  if (!title) return;
+  try {
+    await api('/api/tasks', { title });
+    await loadState();
+    document.getElementById('new-task').focus();
+  } catch (e) { toast(e.message); }
+}
+
+// --- Ações: projetos -------------------------------------------------------
+function toggleNp() {
+  S.np = { open: !S.np.open, name: '', goal: '' };
+  render();
+  if (S.np.open) document.getElementById('np-name').focus();
+}
+async function saveNp() {
+  const name = document.getElementById('np-name').value.trim();
+  const goal = document.getElementById('np-goal').value.trim();
+  if (!name || !goal) { toast('Preencha nome e objetivo do projeto.'); return; }
+  try {
+    await api('/api/projects', { name, goal });
+    S.np = { open: false, name: '', goal: '' };
+    await loadState();
+  } catch (e) { toast(e.message); }
+}
+async function finishProject(id) {
+  try {
+    await api('/api/projects/' + id + '/done', {});
+    await loadState();
+  } catch (e) { toast(e.message); }
+}
+
+// --- Modal: plan -----------------------------------------------------------
+function closeModal() { S.modal = null; render(); }
+function openPlan() {
+  if (!guardLLM()) return;
+  S.modal = 'plan';
+  S.plan = { stage: 'input', text: '', suggested: [] };
+  render();
+}
+async function runPlan() {
+  S.plan.text = document.getElementById('plan-text').value;
+  if (!S.plan.text.trim()) { toast('Descreva o que você tem para hoje.'); return; }
+  S.plan.stage = 'thinking';
+  render();
+  try {
+    const r = await api('/api/plan', { relato: S.plan.text });
+    if (!r.tasks.length) {
+      S.plan.stage = 'input';
+      render();
+      toast('O modelo não sugeriu tarefas. Tente detalhar mais o relato.');
+      return;
+    }
+    S.plan.suggested = r.tasks;
+    S.plan.stage = 'suggest';
+    render();
+  } catch (e) {
+    S.plan.stage = 'input';
+    render();
+    toast(e.message);
+  }
+}
+async function savePlan() {
+  try {
+    await api('/api/plan/save', { tasks: S.plan.suggested });
+    S.modal = null;
+    await loadState();
+  } catch (e) { toast(e.message); }
+}
+
+// --- Modal: checkpoint -----------------------------------------------------
+function openCheckpoint() {
+  if (!guardLLM()) return;
+  const active = S.projects.filter(p => p.active);
+  if (!active.length) { toast('Cadastre um projeto antes de fazer checkpoint.'); return; }
+  S.modal = 'checkpoint';
+  if (active.length === 1) {
+    S.cp = { stage: 'input', projectId: active[0].id, name: active[0].name, goal: active[0].goal, text: '', blocks: [] };
+  } else {
+    S.cp = { stage: 'pick', projectId: null, name: '', goal: '', text: '', blocks: [] };
+  }
+  render();
+}
+function openCheckpointFor(id) {
+  if (!guardLLM()) return;
+  const p = S.projects.find(p => p.id === id);
+  S.modal = 'checkpoint';
+  S.cp = { stage: 'input', projectId: p.id, name: p.name, goal: p.goal, text: '', blocks: [] };
+  render();
+}
+function pickCp(id) {
+  const p = S.projects.find(p => p.id === id);
+  S.cp.stage = 'input';
+  S.cp.projectId = p.id;
+  S.cp.name = p.name;
+  S.cp.goal = p.goal;
+  render();
+}
+async function runCp() {
+  S.cp.text = document.getElementById('cp-text').value;
+  if (!S.cp.text.trim()) { toast('Descreva o progresso antes de avaliar.'); return; }
+  S.cp.stage = 'thinking';
+  render();
+  try {
+    const r = await api('/api/checkpoint', { project_id: S.cp.projectId, progress: S.cp.text });
+    S.cp.blocks = r.blocks;
+    S.cp.stage = 'result';
+    render();
+    loadState();
+  } catch (e) {
+    S.cp.stage = 'input';
+    render();
+    toast(e.message);
+  }
+}
+
+// --- Modal: standup --------------------------------------------------------
+function openStandup() {
+  if (!guardLLM()) return;
+  S.modal = 'standup';
+  S.su = { stage: 'thinking', blocks: [], copied: false };
+  render();
+  api('/api/standup', { days: 1 }).then(r => {
+    S.su.blocks = r.blocks;
+    S.su.stage = 'ready';
+    render();
+  }).catch(e => {
+    S.modal = null;
+    render();
+    toast(e.message);
+  });
+}
+function copyStandup() {
+  const txt = S.su.blocks.map(b => b.title + ': ' + b.body).join('\n');
+  try { navigator.clipboard.writeText(txt); } catch (e) {}
+  S.su.copied = true;
+  render();
+}
+
+function renderModal() {
+  const root = document.getElementById('modal-root');
+  if (!S.modal) { root.innerHTML = ''; return; }
+  let inner = '';
+  if (S.modal === 'plan') {
+    if (S.plan.stage === 'input') {
+      inner = '<div class="modal-title">Planejar o dia</div>'
+        + '<div class="modal-sub">O que você tem para hoje? (reuniões, entregas, pendências)</div>'
+        + '<textarea id="plan-text" rows="5" placeholder="Ex.: demo da sprint às 15h, terminar o rate limiting, o PR de auth ainda está aberto…">' + esc(S.plan.text) + '</textarea>'
+        + '<div class="modal-actions"><button class="btn-plain" onclick="closeModal()">Cancelar</button>'
+        + '<button class="btn-primary" onclick="runPlan()">Planejar com o modelo</button></div>';
+    } else if (S.plan.stage === 'thinking') {
+      inner = '<div class="wait"><span class="spinner lg"></span><span>Planejando o dia…</span></div>';
+    } else {
+      inner = '<div class="modal-title">Sugestão de to-do</div>'
+        + '<div class="modal-sub" style="font-size:13.5px;">Gerada pelo modelo a partir do seu relato e dos projetos ativos.</div>'
+        + '<div class="suggest-list">' + S.plan.suggested.map(s =>
+          '<div class="suggest-item"><span class="num">' + s.priority + '.</span>'
+          + '<span class="txt">' + esc(s.title) + '</span></div>').join('') + '</div>'
+        + '<div class="modal-actions" style="margin-top:18px;"><button class="btn-plain" onclick="closeModal()">Descartar</button>'
+        + '<button class="btn-primary" onclick="savePlan()">Salvar no to-do de hoje</button></div>';
+    }
+  } else if (S.modal === 'checkpoint') {
+    if (S.cp.stage === 'pick') {
+      const active = S.projects.filter(p => p.active);
+      inner = '<div class="modal-title">Checkpoint</div>'
+        + '<div class="modal-sub">De qual projeto?</div>'
+        + '<div class="pick-list">' + active.map(p =>
+          '<button onclick="pickCp(' + p.id + ')"><span class="p-name">' + esc(p.name) + '</span>'
+          + '<span class="p-goal">' + esc(p.goal) + '</span></button>').join('') + '</div>'
+        + '<div class="modal-actions"><button class="btn-plain" onclick="closeModal()">Cancelar</button></div>';
+    } else if (S.cp.stage === 'input') {
+      inner = '<div class="modal-title">Checkpoint — ' + esc(S.cp.name) + '</div>'
+        + '<div class="modal-sub" style="font-size:13.5px;">Objetivo: ' + esc(S.cp.goal) + '</div>'
+        + '<textarea id="cp-text" rows="5" placeholder="Como está o progresso? (o que avançou, o que travou, o que falta)">' + esc(S.cp.text) + '</textarea>'
+        + '<div class="modal-actions"><button class="btn-plain" onclick="closeModal()">Cancelar</button>'
+        + '<button class="btn-primary" onclick="runCp()">Avaliar progresso</button></div>';
+    } else if (S.cp.stage === 'thinking') {
+      inner = '<div class="wait"><span class="spinner lg"></span><span>Avaliando progresso…</span></div>';
+    } else {
+      inner = '<div class="modal-title">Avaliação — ' + esc(S.cp.name) + '</div>'
+        + '<div class="blocks">' + S.cp.blocks.map(b =>
+          '<div><div class="block-title">' + esc(b.title) + '</div>'
+          + '<div class="block-body">' + esc(b.body) + '</div></div>').join('') + '</div>'
+        + '<div class="modal-foot"><span class="saved-note">checkpoint salvo</span>'
+        + '<button class="btn-primary" onclick="closeModal()">Fechar</button></div>';
+    }
+  } else if (S.modal === 'standup') {
+    if (S.su.stage === 'thinking') {
+      inner = '<div class="wait"><span class="spinner lg"></span><span>Preparando o standup…</span></div>';
+    } else {
+      inner = '<div class="modal-title">Fala da daily</div>'
+        + '<div class="modal-sub" style="font-size:13.5px;">Gerada a partir do histórico de ontem e de hoje. Leia em voz alta ou copie.</div>'
+        + '<div class="blocks">' + S.su.blocks.map(b =>
+          '<div><div class="block-title">' + esc(b.title) + '</div>'
+          + '<div class="block-body">' + esc(b.body) + '</div></div>').join('') + '</div>'
+        + '<div class="modal-actions" style="margin-top:20px;">'
+        + '<button class="btn" style="padding:10px 16px; font-size:14px;" onclick="copyStandup()">' + (S.su.copied ? 'Copiado ✓' : 'Copiar') + '</button>'
+        + '<button class="btn-primary" onclick="closeModal()">Fechar</button></div>';
+    }
+  }
+  root.innerHTML = '<div class="overlay"><div class="modal">' + inner + '</div></div>';
+}
+
+// --- Ações: chat -----------------------------------------------------------
+async function sendChat() {
+  const input = document.getElementById('chat-text');
+  const text = input.value.trim();
+  if (!text) return;
+  if (!guardLLM()) return;
+  const history = S.chat.map(m => ({ role: m.role, content: m.content }));
+  S.chat.push({ role: 'user', content: text });
+  S.chatThinking = true;
+  render();
+  try {
+    const r = await api('/api/chat', { message: text, history });
+    S.chat.push({ role: 'assistant', content: r.reply });
+  } catch (e) {
+    toast(e.message);
+  }
+  S.chatThinking = false;
+  render();
+  const el = document.getElementById('chat-text');
+  if (el) el.focus();
+}
+
+// --- Ações: histórico ------------------------------------------------------
+function histShift(n) {
+  if (n > 0 && S.histDay >= S.today) return;
+  S.histDay = shiftDay(S.histDay, n);
+  loadHist();
+}
+
+// --- Boot ------------------------------------------------------------------
+let saved = null;
+try { saved = localStorage.getItem('wa-theme'); } catch (e) {}
+if (saved === 'dark' || saved === 'light') applyTheme(saved);
+loadState().catch(() => toast('Não consegui carregar os dados — o servidor `wa web` caiu?'));
+checkHealth();
+setInterval(checkHealth, 15000);
+</script>
+</body>
+</html>

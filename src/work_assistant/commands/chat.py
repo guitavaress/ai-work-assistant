@@ -4,7 +4,7 @@ import typer
 from rich.console import Console
 from rich.markdown import Markdown
 
-from work_assistant import context, db, llm
+from work_assistant import db, llm, services
 
 app = typer.Typer()
 console = Console()
@@ -14,11 +14,7 @@ console = Console()
 def chat():
     """Conversa com o assistente (Ctrl+D ou 'sair' para encerrar)."""
     conn = db.connect()
-    system = (
-        llm.load_prompt("chat")
-        + f"\n\nTarefas de hoje:\n{context.tasks_block(conn)}"
-        + f"\n\nProjetos ativos:\n{context.projects_block(conn)}"
-    )
+    system = services.chat_system(conn)
     console.print("[dim]Chat iniciado. Ctrl+D ou 'sair' para encerrar.[/dim]\n")
     history: list[dict] = []
     while True:

@@ -51,14 +51,20 @@ def complete(
     return response.choices[0].message.content or ""
 
 
-def structured(system: str, user: str, schema: dict, model: str | None = None) -> dict:
+def structured(
+    system: str, user: str, schema: dict, model: str | None = None, quality: bool = False
+) -> dict:
     """Chat com saída JSON garantida pelo schema (gramática no llama.cpp).
 
     Thinking sempre desligado aqui: com ele ativo o modelo gasta o orçamento
     de tokens raciocinando e devolve o JSON vazio.
     """
-    response = client().chat.completions.create(
-        model=model or config.LLM_MODEL,
+    if quality and config.QUALITY_MODEL:
+        api, default_model = client(config.QUALITY_BASE_URL), config.QUALITY_MODEL
+    else:
+        api, default_model = client(), config.LLM_MODEL
+    response = api.chat.completions.create(
+        model=model or default_model,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},

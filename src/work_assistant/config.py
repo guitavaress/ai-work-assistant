@@ -32,6 +32,13 @@ ENABLE_THINKING = os.environ.get("WA_ENABLE_THINKING", "") == "1"
 
 MAX_TOKENS = int(os.environ.get("WA_MAX_TOKENS", "2048"))
 
+# Interface web local (`wa web`)
+WEB_HOST = os.environ.get("WA_WEB_HOST", "127.0.0.1")
+WEB_PORT = int(os.environ.get("WA_WEB_PORT", "8765"))
+
+# Nome usado na saudação da interface web (vazio = saudação sem nome)
+USER_NAME = os.environ.get("WA_USER_NAME", "")
+
 
 def ensure_data_dir() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
