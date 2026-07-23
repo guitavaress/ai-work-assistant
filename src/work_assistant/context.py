@@ -9,11 +9,18 @@ def tasks_block(conn: sqlite3.Connection, day: str | None = None) -> str:
     tasks = db.list_tasks(conn, day=day)
     if not tasks:
         return "Nenhuma tarefa registrada para o dia."
+    project_names = {p.id: p.name for p in db.list_projects(conn, include_done=True)}
     lines = []
     for t in tasks:
         status = "feita" if t.status == "done" else "pendente"
         prio = f", prioridade {t.priority}" if t.priority else ""
-        lines.append(f"- [{status}{prio}] {t.title}")
+        due = ""
+        if t.due_date:
+            late = " ATRASADA" if t.status != "done" and t.due_date < db.today() else ""
+            due = f", prazo {t.due_date}{late}"
+        tags = f", tags: {t.tags}" if t.tags else ""
+        project = f", projeto: {project_names[t.project_id]}" if t.project_id in project_names else ""
+        lines.append(f"- [{status}{prio}{due}{tags}{project}] {t.title}")
     return "\n".join(lines)
 
 
@@ -25,7 +32,8 @@ def projects_block(conn: sqlite3.Connection) -> str:
     for p in projects:
         checkpoints = db.list_checkpoints(conn, p.id)
         last = f" (último checkpoint: {checkpoints[-1].created_at[:10]})" if checkpoints else " (sem checkpoints ainda)"
-        lines.append(f"- {p.name}: {p.goal}{last}")
+        deadline = f" [prazo: {p.deadline}]" if p.deadline else ""
+        lines.append(f"- {p.name}: {p.goal}{deadline}{last}")
     return "\n".join(lines)
 
 

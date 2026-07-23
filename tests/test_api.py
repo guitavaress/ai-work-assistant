@@ -1,5 +1,7 @@
 """Testes da API web. O LLM é sempre mockado (convenção do projeto)."""
 
+from datetime import date, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -65,6 +67,124 @@ def test_add_task_empty_title_rejected(client):
     assert client.post("/api/tasks", json={"title": "   "}).status_code == 422
 
 
+def test_add_task_with_due_tags_effort(client):
+    created = client.post(
+        "/api/tasks",
+        json={"title": "Nova", "due_date": "2030-01-05", "tags": ["Bug", "dados"], "effort": "m"},
+    ).json()
+    assert created["due"] == "2030-01-05"
+    assert created["tags"] == ["bug", "dados"]
+    assert created["effort"] == "M"
+    assert created["source"] == "manual"
+
+
+def test_add_task_invalid_due_422(client):
+    resp = client.post("/api/tasks", json={"title": "x", "due_date": "amanhã"})
+    assert resp.status_code == 422
+    assert "YYYY-MM-DD" in resp.json()["detail"]
+
+
+def test_add_task_with_project(client, conn):
+    project = db.add_project(conn, "API v2", "Publicar API v2")
+    created = client.post(
+        "/api/tasks", json={"title": "Endpoint de auth", "project_id": project.id}
+    ).json()
+    assert created["project_id"] == project.id
+    assert created["project_name"] == "API v2"
+
+
+def test_add_task_invalid_project_422(client):
+    resp = client.post("/api/tasks", json={"title": "x", "project_id": 999})
+    assert resp.status_code == 422
+
+
+def test_set_task_project_endpoint(client, conn):
+    project = db.add_project(conn, "API v2", "Publicar API v2")
+    task = db.add_task(conn, "sem projeto")
+
+    resp = client.post(f"/api/tasks/{task.id}/project", json={"project_id": project.id})
+    body = resp.json()
+    assert body["project_id"] == project.id
+    assert body["project_name"] == "API v2"
+
+    cleared = client.post(f"/api/tasks/{task.id}/project", json={"project_id": None}).json()
+    assert cleared["project_id"] is None
+
+
+def test_set_task_project_missing_task_404(client):
+    resp = client.post("/api/tasks/999/project", json={"project_id": None})
+    assert resp.status_code == 404
+
+
+def test_set_task_project_invalid_project_404(client, conn):
+    task = db.add_task(conn, "sem projeto")
+    resp = client.post(f"/api/tasks/{task.id}/project", json={"project_id": 999})
+    assert resp.status_code == 404
+
+
+def test_edit_task_sets_all_fields(client, conn):
+    project = db.add_project(conn, "API v2", "Publicar API v2")
+    task = db.add_task(conn, "Corrigir job")
+    body = {
+        "project_id": project.id,
+        "tags": ["Bug", "dados"],
+        "due_date": "2030-01-05",
+        "effort": "g",
+    }
+    edited = client.post(f"/api/tasks/{task.id}", json=body).json()
+    assert edited["project_id"] == project.id
+    assert edited["project_name"] == "API v2"
+    assert edited["tags"] == ["bug", "dados"]
+    assert edited["due"] == "2030-01-05"
+    assert edited["effort"] == "G"
+
+
+def test_edit_task_clears_fields(client, conn):
+    project = db.add_project(conn, "API v2", "Publicar API v2")
+    task = db.add_task(
+        conn, "x", project_id=project.id, tags="bug", due_date="2030-01-05", effort="M"
+    )
+    edited = client.post(f"/api/tasks/{task.id}", json={}).json()
+    assert edited["project_id"] is None
+    assert edited["tags"] == []
+    assert edited["due"] is None
+    assert edited["effort"] is None
+
+
+def test_edit_task_invalid_due_422(client, conn):
+    task = db.add_task(conn, "x")
+    resp = client.post(f"/api/tasks/{task.id}", json={"due_date": "amanhã"})
+    assert resp.status_code == 422
+
+
+def test_edit_task_invalid_project_404(client, conn):
+    task = db.add_task(conn, "x")
+    resp = client.post(f"/api/tasks/{task.id}", json={"project_id": 999})
+    assert resp.status_code == 404
+
+
+def test_edit_task_missing_task_404(client):
+    assert client.post("/api/tasks/999", json={}).status_code == 404
+
+
+def test_project_timeline_includes_status(client, conn):
+    project = db.add_project(conn, "API v2", "Publicar API v2")
+    db.add_checkpoint(conn, project.id, "relato", "aval", status="em risco", summary="Resumo.")
+    out = client.get("/api/state").json()["projects"][0]
+    assert out["timeline"][0]["status"] == "em risco"
+
+
+def test_project_out_includes_task_counts(client, conn):
+    project = client.post("/api/projects", json={"name": "API v2", "goal": "meta"}).json()
+    done_task = db.add_task(conn, "feita", project_id=project["id"])
+    db.add_task(conn, "pendente", project_id=project["id"])
+    db.complete_task(conn, done_task.id)
+    state = client.get("/api/state").json()
+    tasks = state["projects"][0]["tasks"]
+    assert tasks["total"] == 2
+    assert tasks["done"] == 1
+
+
 def test_toggle_missing_task_404(client):
     assert client.post("/api/tasks/999/toggle").status_code == 404
 
@@ -104,6 +224,27 @@ def test_plan_suggests_and_saves_with_dedupe(client, conn, monkeypatch):
     titles = [t["title"] for t in saved["tasks"]]
     assert titles.count("Já existe") == 1
     assert "Nova do modelo" in titles
+
+
+def test_add_project_with_deadline(client):
+    created = client.post(
+        "/api/projects", json={"name": "X", "goal": "meta", "deadline": "2030-05-01"}
+    ).json()
+    assert created["deadline"] == "2030-05-01"
+
+
+def test_plan_save_records_source_and_fields(client, conn):
+    suggested = {
+        "tasks": [
+            {"title": "Do modelo", "priority": 1, "due_date": db.today(), "tags": ["dados"], "effort": "M"}
+        ]
+    }
+    client.post("/api/plan/save", json=suggested)
+    task = db.list_tasks(conn)[0]
+    assert task.source == "plan"
+    assert task.tags == "dados"
+    assert task.effort == "M"
+    assert task.due_date == db.today()
 
 
 def test_checkpoint_saves_status_and_summary(client, conn, monkeypatch):
@@ -166,6 +307,51 @@ def test_chat_uses_history(client, monkeypatch):
     )
     assert resp.json()["reply"] == "Resposta do modelo"
     assert captured["history"] == [{"role": "user", "content": "oi"}]
+
+
+def test_review_metrics_endpoint(client, conn):
+    done = db.add_task(conn, "feita", due_date=db.today(), tags="bug", effort="P", source="plan")
+    db.complete_task(conn, done.id)
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    db.add_task(conn, "atrasada", due_date=yesterday, tags="dados")
+
+    body = client.get("/api/review", params={"days": 7}).json()
+    assert body["total"] == 2
+    assert body["done"] == 1
+    assert [t["title"] for t in body["overdue"]] == ["atrasada"]
+    assert body["on_time_rate"] == 1.0
+    assert body["unplanned_rate"] == 0.5
+    assert body["carryover_rate"] == 0.0
+    assert body["by_tag"]["dados"]["overdue"] == 1
+    assert body["by_effort"]["P"]["done"] == 1
+    assert len(body["done_per_day"]) == 7
+    assert body["done_per_day"][-1] == {"day": db.today(), "done": 1}
+
+
+def test_review_assessment(client, conn, monkeypatch):
+    task = db.add_task(conn, "feita")
+    db.complete_task(conn, task.id)
+    monkeypatch.setattr(llm, "complete", lambda *a, **k: "**Avaliação** do período.")
+    body = client.post("/api/review", json={"days": 7}).json()
+    assert body["assessment"] == "**Avaliação** do período."
+    assert body["metrics"]["done"] == 1
+
+
+def test_review_without_tasks_409(client):
+    assert client.post("/api/review", json={"days": 7}).status_code == 409
+
+
+def test_review_metrics_by_project(client, conn):
+    project = db.add_project(conn, "API v2", "Publicar API v2")
+    done = db.add_task(conn, "feita", project_id=project.id)
+    db.complete_task(conn, done.id)
+    db.add_task(conn, "sem projeto")
+
+    body = client.get("/api/review", params={"days": 7}).json()
+    entry = body["by_project"][str(project.id)]
+    assert entry["name"] == "API v2"
+    assert entry["total"] == 1
+    assert entry["done"] == 1
 
 
 def test_llm_offline_returns_503(client, conn, monkeypatch):
