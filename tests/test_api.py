@@ -122,6 +122,58 @@ def test_set_task_project_invalid_project_404(client, conn):
     assert resp.status_code == 404
 
 
+def test_edit_task_sets_all_fields(client, conn):
+    project = db.add_project(conn, "API v2", "Publicar API v2")
+    task = db.add_task(conn, "Corrigir job")
+    body = {
+        "project_id": project.id,
+        "tags": ["Bug", "dados"],
+        "due_date": "2030-01-05",
+        "effort": "g",
+    }
+    edited = client.post(f"/api/tasks/{task.id}", json=body).json()
+    assert edited["project_id"] == project.id
+    assert edited["project_name"] == "API v2"
+    assert edited["tags"] == ["bug", "dados"]
+    assert edited["due"] == "2030-01-05"
+    assert edited["effort"] == "G"
+
+
+def test_edit_task_clears_fields(client, conn):
+    project = db.add_project(conn, "API v2", "Publicar API v2")
+    task = db.add_task(
+        conn, "x", project_id=project.id, tags="bug", due_date="2030-01-05", effort="M"
+    )
+    edited = client.post(f"/api/tasks/{task.id}", json={}).json()
+    assert edited["project_id"] is None
+    assert edited["tags"] == []
+    assert edited["due"] is None
+    assert edited["effort"] is None
+
+
+def test_edit_task_invalid_due_422(client, conn):
+    task = db.add_task(conn, "x")
+    resp = client.post(f"/api/tasks/{task.id}", json={"due_date": "amanhã"})
+    assert resp.status_code == 422
+
+
+def test_edit_task_invalid_project_404(client, conn):
+    task = db.add_task(conn, "x")
+    resp = client.post(f"/api/tasks/{task.id}", json={"project_id": 999})
+    assert resp.status_code == 404
+
+
+def test_edit_task_missing_task_404(client):
+    assert client.post("/api/tasks/999", json={}).status_code == 404
+
+
+def test_project_timeline_includes_status(client, conn):
+    project = db.add_project(conn, "API v2", "Publicar API v2")
+    db.add_checkpoint(conn, project.id, "relato", "aval", status="em risco", summary="Resumo.")
+    out = client.get("/api/state").json()["projects"][0]
+    assert out["timeline"][0]["status"] == "em risco"
+
+
 def test_project_out_includes_task_counts(client, conn):
     project = client.post("/api/projects", json={"name": "API v2", "goal": "meta"}).json()
     done_task = db.add_task(conn, "feita", project_id=project["id"])

@@ -14,8 +14,9 @@ body {
   --bg:#F7F5F0; --card:#FFFFFF; --border:#E5E1D8; --line:#F0EDE5; --ink:#1C1B18;
   --dim:#6E6A5F; --faint:#B9B4A6; --accent:#2E6B4F; --accent-ink:#FFFFFF;
   --accent-soft:#EDF3EE; --accent-border:#CFE0D4; --accent-text:#2A4A3A;
+  --amber:#B07A16; --amber-bg:#F5EAD0; --warn:#C2542E; --warn-bg:#F6E1D8;
   --chip:#EFECE3; --p1bg:#F6E8DE; --p1ink:#8A4B2D; --btn:#F3F0E9;
-  --ok:#3E9B6B; --warn:#C2542E; --overlay:rgba(20,19,16,0.45); --shadow:rgba(28,27,24,0.08);
+  --ok:#3E9B6B; --overlay:rgba(20,19,16,0.45); --shadow:rgba(28,27,24,0.08);
   --pc0bg:#F6E8DE; --pc0ink:#8A4B2D; --pc1bg:#E3EDF7; --pc1ink:#2D5C8A;
   --pc2bg:#F0E8F7; --pc2ink:#6B3D8A; --pc3bg:#E8F3E9; --pc3ink:#3D7A45;
   --pc4bg:#FBEBE3; --pc4ink:#A04A2E; --pc5bg:#EAF0F1; --pc5ink:#3D6B70;
@@ -24,14 +25,15 @@ body.dark {
   --bg:#171612; --card:#201E19; --border:#34312A; --line:#2A2822; --ink:#F0EDE5;
   --dim:#A8A296; --faint:#6E6A5F; --accent:#4E9C74; --accent-ink:#0E1F17;
   --accent-soft:#1E2A23; --accent-border:#2E4A3B; --accent-text:#A8D5BC;
+  --amber:#D9AB4E; --amber-bg:#3A311C; --warn:#E07B52; --warn-bg:#3A2417;
   --chip:#2A2822; --p1bg:#3A2417; --p1ink:#E5A583; --btn:#262420;
-  --ok:#4FBF85; --warn:#E07B52; --overlay:rgba(0,0,0,0.55); --shadow:rgba(0,0,0,0.35);
+  --ok:#4FBF85; --overlay:rgba(0,0,0,0.55); --shadow:rgba(0,0,0,0.35);
   --pc0bg:#3A2417; --pc0ink:#E5A583; --pc1bg:#1E2E3D; --pc1ink:#8FBBDD;
   --pc2bg:#2D2038; --pc2ink:#C8A3DD; --pc3bg:#1E2E22; --pc3ink:#8FCB9C;
   --pc4bg:#3A2019; --pc4ink:#E5A088; --pc5bg:#1C2A2B; --pc5ink:#8FC0C4;
 }
 a { color: var(--accent); } a:hover { opacity: 0.8; }
-input, textarea, button { font-family: inherit; }
+input, textarea, button, select { font-family: inherit; }
 input::placeholder, textarea::placeholder { color: var(--faint); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .mono { font-family: 'JetBrains Mono', monospace; }
@@ -42,7 +44,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   padding: 14px 32px; border-bottom: 1px solid var(--border);
   position: sticky; top: 0; background: var(--bg); z-index: 10;
 }
-.topbar-left { display: flex; align-items: center; gap: 28px; }
+.topbar-left { display: flex; align-items: center; gap: 24px; }
 .brand { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 16px; }
 .brand span { color: var(--accent); }
 .nav { display: flex; gap: 4px; }
@@ -52,6 +54,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .nav button.active { background: var(--chip); color: var(--ink); font-weight: 600; }
 .topbar-right { display: flex; align-items: center; gap: 14px; }
+.daynav { display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--dim); }
+.daynav button { border: 1px solid var(--border); background: var(--card); color: var(--dim); border-radius: 6px; width: 26px; height: 26px; cursor: pointer; }
+.daynav .lbl { padding: 0 6px; min-width: 66px; text-align: center; }
 .server { display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); }
 .server .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; }
 .server.off .dot { background: var(--warn); }
@@ -60,210 +65,169 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 14px;
 }
 
-.container { flex: 1; width: 100%; max-width: 680px; margin: 0 auto; padding: 44px 24px 72px; box-sizing: border-box; }
+.container { flex: 1; width: 100%; max-width: 1160px; margin: 0 auto; padding: 32px 32px 72px; box-sizing: border-box; }
 .view { display: none; }
 .view.active { display: block; }
-.stack { display: flex; flex-direction: column; gap: 26px; }
-.stack-md { display: flex; flex-direction: column; gap: 22px; }
 .kicker { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--dim); }
-.h1 { font-size: 34px; font-weight: 600; letter-spacing: -0.5px; margin-top: 4px; }
-.h2 { font-size: 30px; font-weight: 600; letter-spacing: -0.4px; margin-top: 2px; }
+.h-lg { font-size: 30px; font-weight: 600; letter-spacing: -0.4px; margin-top: 2px; }
+.page-head { display: flex; justify-content: space-between; align-items: flex-end; }
 
-.banner {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  background: var(--accent-soft); border: 1px solid var(--accent-border);
-  border-radius: 12px; padding: 16px 20px;
-}
-.banner div { font-size: 15px; color: var(--accent-text); }
+.cols { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
+.col { display: flex; flex-direction: column; gap: 16px; }
+.col-head { display: flex; justify-content: space-between; align-items: baseline; }
+.col-title { font-size: 26px; font-weight: 600; letter-spacing: -0.4px; margin-top: 2px; }
+.col-count { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); }
+@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } .tables { grid-template-columns: 1fr !important; } .mgrid { grid-template-columns: repeat(2, 1fr) !important; } }
 
-.btn-primary {
-  background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px;
-  padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
-}
-.btn {
-  border: 1px solid var(--border); background: var(--btn); color: var(--ink);
-  border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer;
-}
+.btn-primary { background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn { border: 1px solid var(--border); background: var(--btn); color: var(--ink); border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
 .btn-plain { border: none; background: transparent; color: var(--dim); font-size: 13px; cursor: pointer; }
 .btn-link { border: none; background: transparent; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; }
 
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; }
-.card-list { padding: 8px 0; }
-.card-pad { padding: 18px 22px; }
-.card-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 22px 10px; }
-.card-title { font-size: 16px; font-weight: 600; }
-.card-count { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); }
+.banner { display: flex; align-items: center; gap: 12px; background: var(--accent-soft); border: 1px solid var(--accent-border); border-radius: 12px; padding: 14px 18px; }
+.banner span { font-size: 14px; color: var(--accent-text); flex: 1; }
 
-.task-row { display: flex; align-items: center; gap: 14px; padding: 13px 22px; border-top: 1px solid var(--line); }
-.task-row.done { opacity: 0.55; }
-.checkbox {
-  width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; cursor: pointer;
+/* Task rows */
+.trow { display: flex; align-items: flex-start; gap: 13px; padding: 14px 22px; border-top: 1px solid var(--line); margin-top: -1px; }
+.trow:first-child { border-top: none; margin-top: 0; }
+.trow.done { opacity: 0.55; }
+.trow.editable { cursor: pointer; }
+.trow.editable:hover { background: var(--line); }
+.tcheck {
+  width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; margin-top: 1px;
   border: 2px solid var(--faint); background: transparent; color: var(--accent-ink);
   display: flex; align-items: center; justify-content: center; font-size: 13px; box-sizing: border-box;
 }
-.checkbox.checked { border-color: var(--accent); background: var(--accent); }
-.checkbox.static { cursor: default; }
-.prio {
-  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
-  color: var(--dim); background: var(--chip); padding: 2px 7px; border-radius: 5px;
-}
-.prio.p1 { color: var(--p1ink); background: var(--p1bg); }
-.eff {
-  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
-  color: var(--dim); border: 1px solid var(--border); padding: 1px 6px; border-radius: 5px;
-}
-.due {
-  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim);
-  background: var(--chip); padding: 2px 7px; border-radius: 5px; white-space: nowrap;
-}
-.due.late { color: var(--p1ink); background: var(--p1bg); font-weight: 600; }
-.task-title { font-size: 15px; flex: 1; }
-.task-title.done { text-decoration: line-through; }
-.task-chips { display: flex; gap: 6px; align-items: center; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; max-width: 55%; }
-.add-row { padding: 14px 22px 6px; border-top: 1px solid var(--line); display: flex; }
-.add-row input#new-task { flex: 1; border: none; background: transparent; font-size: 15px; color: var(--ink); outline: none; box-sizing: border-box; min-width: 0; }
-.add-opts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 22px 14px; }
-.add-opts .opt {
-  border: 1px solid var(--border); background: var(--bg); color: var(--dim);
-  border-radius: 6px; padding: 5px 9px; font-size: 12px; outline: none;
-  font-family: 'JetBrains Mono', monospace;
-}
-.add-opts input.opt::-webkit-calendar-picker-indicator { opacity: 0.5; }
-.add-opts input.opt[type=text] { flex: 1 1 130px; min-width: 100px; }
+.tcheck.checked { border-color: var(--accent); background: var(--accent); }
+.tcheck.act { cursor: pointer; }
+.tprio { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--dim); background: var(--chip); padding: 2px 7px; border-radius: 5px; margin-top: 1px; }
+.tprio.p1 { color: var(--p1ink); background: var(--p1bg); }
+.tmain { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ttitle { font-size: 15px; }
+.ttitle.done { text-decoration: line-through; }
+.tmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.m-eff { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; color: var(--dim); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
+.m-proj { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--faint); }
+.m-tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent-text); background: var(--accent-soft); border-radius: 5px; padding: 1px 7px; }
+.m-due { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim); background: var(--chip); border-radius: 5px; padding: 1px 7px; }
+.m-due.late { color: var(--warn); background: var(--warn-bg); }
+.addbar { padding: 13px 22px; border-top: 1px solid var(--line); margin-top: -1px; }
+.addbar input { width: 100%; border: none; background: transparent; font-size: 15px; color: var(--ink); outline: none; box-sizing: border-box; }
 
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.mini-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.mini-title { font-size: 14px; font-weight: 600; }
-.chip-col { display: flex; flex-direction: column; gap: 10px; }
-.chip-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.chip-row span:first-child { font-size: 14px; }
-.tag {
-  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim);
-  background: var(--chip); padding: 2px 7px; border-radius: 5px; white-space: nowrap;
-}
-.tag.ok { color: var(--accent); background: var(--accent-soft); }
-.tag.risk { color: var(--warn); background: var(--p1bg); }
-.proj-chip {
-  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
-  padding: 2px 7px; border-radius: 5px; white-space: nowrap;
-  background: var(--chip); color: var(--dim);
-}
-.proj-select {
-  border: none; outline: none; cursor: pointer;
-  appearance: none; -webkit-appearance: none;
-  max-width: 130px; text-overflow: ellipsis;
-  padding: 2px 17px 2px 8px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%23888' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 6px center;
-}
-.proj-select:disabled {
-  cursor: default; opacity: 0.7; background-image: none; padding-right: 8px;
-}
+/* Sidebar cards */
+.scard { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 22px; }
+.scard-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.scard-title { font-size: 15px; font-weight: 600; }
+.scard-sub { font-size: 13px; color: var(--dim); margin-top: 4px; }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.pmini { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.pmini + .pmini { margin-top: 14px; }
+.pmini-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pmini-name { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pmini-name span.txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pbar-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.pbar { flex: 1; height: 5px; background: var(--chip); border-radius: 999px; overflow: hidden; }
+.pbar-fill { height: 100%; background: var(--accent); }
+.pmini-prog { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--faint); white-space: nowrap; }
+.pmini-dl { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim); margin-top: 8px; }
+
+.sbadge { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim); background: var(--chip); padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
+.sbadge.ok { color: var(--accent); background: var(--accent-soft); }
+.sbadge.risk { color: var(--warn); background: var(--warn-bg); }
 .proj-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
-.proj-chip.c0 { background: var(--pc0bg); color: var(--pc0ink); }
-.proj-chip.c1 { background: var(--pc1bg); color: var(--pc1ink); }
-.proj-chip.c2 { background: var(--pc2bg); color: var(--pc2ink); }
-.proj-chip.c3 { background: var(--pc3bg); color: var(--pc3ink); }
-.proj-chip.c4 { background: var(--pc4bg); color: var(--pc4ink); }
-.proj-chip.c5 { background: var(--pc5bg); color: var(--pc5ink); }
-.proj-dot.c0 { background: var(--pc0ink); }
-.proj-dot.c1 { background: var(--pc1ink); }
-.proj-dot.c2 { background: var(--pc2ink); }
-.proj-dot.c3 { background: var(--pc3ink); }
-.proj-dot.c4 { background: var(--pc4ink); }
-.proj-dot.c5 { background: var(--pc5ink); }
-.quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.proj-chip { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 5px; white-space: nowrap; background: var(--chip); color: var(--dim); }
+.proj-chip.c0 { background: var(--pc0bg); color: var(--pc0ink); } .proj-dot.c0 { background: var(--pc0ink); }
+.proj-chip.c1 { background: var(--pc1bg); color: var(--pc1ink); } .proj-dot.c1 { background: var(--pc1ink); }
+.proj-chip.c2 { background: var(--pc2bg); color: var(--pc2ink); } .proj-dot.c2 { background: var(--pc2ink); }
+.proj-chip.c3 { background: var(--pc3bg); color: var(--pc3ink); } .proj-dot.c3 { background: var(--pc3ink); }
+.proj-chip.c4 { background: var(--pc4bg); color: var(--pc4ink); } .proj-dot.c4 { background: var(--pc4ink); }
+.proj-chip.c5 { background: var(--pc5bg); color: var(--pc5ink); } .proj-dot.c5 { background: var(--pc5ink); }
 
-.proj-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; }
-.proj-card.done { opacity: 0.55; }
-.proj-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.proj-name { font-size: 18px; font-weight: 600; }
-.proj-goal { font-size: 14px; color: var(--dim); margin-top: 4px; }
-.proj-actions { display: flex; gap: 8px; margin-top: 16px; }
-.timeline { margin-top: 18px; display: flex; flex-direction: column; }
-.tl-item { display: flex; gap: 12px; }
-.tl-rail { display: flex; flex-direction: column; align-items: center; }
-.tl-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); margin-top: 4px; flex-shrink: 0; }
-.tl-dot.last { background: var(--accent); }
-.tl-line { width: 1.5px; flex: 1; background: var(--border); }
-.tl-line.end { background: transparent; }
-.tl-body { padding-bottom: 16px; }
-.tl-body.end { padding-bottom: 0; }
-.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--faint); }
-.tl-summary { font-size: 13.5px; color: var(--dim); margin-top: 2px; max-width: 520px; }
+/* Projetos view */
+.stackv { display: flex; flex-direction: column; gap: 22px; }
+.pcard { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; }
+.pcard.done { opacity: 0.55; }
+.pcard-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.pcard-name { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 9px; }
+.pcard-goal { font-size: 14px; color: var(--dim); margin-top: 4px; }
+.pcard-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); }
+.pcard-actions { display: flex; gap: 8px; margin-top: 16px; }
+.ptl { margin-top: 18px; display: flex; flex-direction: column; }
+.ptl-item { display: flex; gap: 12px; }
+.ptl-rail { display: flex; flex-direction: column; align-items: center; }
+.ptl-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); margin-top: 4px; flex-shrink: 0; }
+.ptl-dot.last { background: var(--accent); }
+.ptl-line { width: 1.5px; flex: 1; background: var(--border); }
+.ptl-line.end { background: transparent; }
+.ptl-body { padding-bottom: 16px; }
+.ptl-body.end { padding-bottom: 0; }
+.ptl-top { display: flex; align-items: center; gap: 8px; }
+.ptl-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--faint); }
+.ptl-sum { font-size: 13.5px; color: var(--dim); margin-top: 3px; max-width: 520px; }
 .np-form { background: var(--card); border: 1px solid var(--accent-border); border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
-.np-form input {
-  border: 1px solid var(--border); background: var(--bg); color: var(--ink);
-  border-radius: 8px; padding: 10px 14px; font-size: 14px; outline: none; box-sizing: border-box;
-}
-.np-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.np-form input { border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 10px 14px; font-size: 14px; outline: none; box-sizing: border-box; }
+.np-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
 
-.chat-wrap { display: flex; flex-direction: column; gap: 18px; min-height: 60vh; }
+/* Chat */
+.chat-wrap { display: flex; flex-direction: column; gap: 18px; min-height: 60vh; max-width: 720px; margin: 0 auto; }
 .chat-msgs { flex: 1; display: flex; flex-direction: column; gap: 12px; }
 .chat-empty { color: var(--faint); font-size: 14px; padding: 24px 0; }
 .bubble { max-width: 78%; padding: 12px 16px; font-size: 14.5px; line-height: 1.55; white-space: pre-wrap; }
 .bubble.user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 14px 14px 4px 14px; }
 .bubble.bot { align-self: flex-start; background: var(--card); color: var(--ink); border: 1px solid var(--border); border-radius: 14px 14px 14px 4px; }
-.bubble code, .block-body code {
-  font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
-  background: var(--chip); border-radius: 4px; padding: 1px 5px;
-}
+.bubble code, .block-body code, .ablock-body code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; background: var(--chip); border-radius: 4px; padding: 1px 5px; }
 .bubble code.blk { display: block; padding: 8px 10px; margin: 4px 0; white-space: pre-wrap; overflow-x: auto; }
 .thinking { align-self: flex-start; display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 13px; padding: 6px 2px; }
 .spinner { width: 14px; height: 14px; border: 2px solid var(--chip); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite; }
 .spinner.lg { width: 18px; height: 18px; border-width: 2.5px; }
+.spinner.acc { border-color: var(--accent-border); border-top-color: var(--accent); }
 .chat-input { display: flex; gap: 10px; position: sticky; bottom: 24px; }
-.chat-input input {
-  flex: 1; border: 1px solid var(--border); background: var(--card); color: var(--ink);
-  border-radius: 10px; padding: 13px 16px; font-size: 14.5px; outline: none;
-  box-shadow: 0 6px 18px var(--shadow); box-sizing: border-box;
-}
+.chat-input input { flex: 1; border: 1px solid var(--border); background: var(--card); color: var(--ink); border-radius: 10px; padding: 13px 16px; font-size: 14.5px; outline: none; box-shadow: 0 6px 18px var(--shadow); box-sizing: border-box; }
 .chat-input button { background: var(--accent); color: var(--accent-ink); border: none; border-radius: 10px; padding: 0 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.fab { position: fixed; right: 28px; bottom: 28px; display: flex; align-items: center; gap: 8px; background: var(--ink); color: var(--bg); border-radius: 999px; padding: 12px 20px; font-size: 14px; font-weight: 600; box-shadow: 0 8px 20px var(--shadow); cursor: pointer; z-index: 40; }
+.fab .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
 
-.mgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-.mcard { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
-.mcard .mval { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 600; }
-.mcard .mval.bad { color: var(--warn); }
-.mcard .mlabel { font-size: 12px; color: var(--dim); margin-top: 3px; }
-.chart { display: flex; align-items: flex-end; gap: 4px; height: 90px; padding: 6px 2px 0; }
-.chart .bar { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; opacity: 0.85; }
-.chart .bar.zero { background: var(--chip); }
-.chart-days { display: flex; gap: 4px; margin-top: 6px; }
-.chart-days span { flex: 1; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--faint); overflow: hidden; }
-.rev-rows { display: flex; flex-direction: column; }
-.rev-row { display: flex; align-items: center; gap: 10px; padding: 10px 22px; border-top: 1px solid var(--line); font-size: 14px; }
-.rev-row .grow { flex: 1; }
-.rev-row .num { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); white-space: nowrap; }
-.rev-row .num.bad { color: var(--warn); font-weight: 600; }
-.range-btns { display: flex; gap: 6px; }
-.range-btns button {
-  border: 1px solid var(--border); background: var(--card); color: var(--dim);
-  border-radius: 7px; padding: 5px 11px; font-size: 12px; cursor: pointer;
-  font-family: 'JetBrains Mono', monospace;
-}
-.range-btns button.active { background: var(--chip); color: var(--ink); font-weight: 600; }
-.assess { padding: 4px 22px 16px; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; }
-.hist-nav { display: flex; align-items: center; gap: 10px; }
-.hist-nav .label { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--ink); min-width: 220px; text-align: center; }
-.hist-empty { color: var(--faint); font-size: 14px; padding: 22px; }
+/* Análise */
+.seg { display: flex; gap: 4px; background: var(--chip); border-radius: 8px; padding: 3px; }
+.seg button { border: none; background: transparent; color: var(--dim); border-radius: 6px; padding: 6px 12px; font-size: 13px; font-family: 'JetBrains Mono', monospace; cursor: pointer; }
+.seg button.active { background: var(--card); color: var(--ink); }
+.mgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.mcard { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.mval { font-size: 26px; font-weight: 600; }
+.mval.bad { color: var(--warn); }
+.mlabel { font-size: 12.5px; color: var(--dim); margin-top: 2px; }
+.spark { display: flex; align-items: flex-end; gap: 5px; height: 96px; }
+.spark-col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 5px; }
+.spark-bar { width: 100%; min-height: 3px; border-radius: 3px; }
+.spark-tick { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--faint); }
+.tables { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.rtable { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 22px; }
+.rtable-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.rt-head { display: flex; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--faint); padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.rt-row { display: flex; align-items: center; font-size: 13.5px; padding: 9px 0; border-top: 1px solid var(--line); margin-top: -1px; }
+.rt-row:first-of-type { border-top: none; }
+.assess-panel { background: var(--accent-soft); border: 1px solid var(--accent-border); border-radius: 14px; padding: 22px 24px; }
+.assess-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.assess-title { font-size: 15px; font-weight: 600; color: var(--accent-text); }
+.assess-sub { font-size: 14px; color: var(--accent-text); opacity: 0.85; }
+.ablocks { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
+.ablock-title { font-size: 13px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.4px; }
+.ablock-body { font-size: 14.5px; line-height: 1.55; color: var(--ink); margin-top: 4px; white-space: pre-line; }
 
+/* Modals */
 .overlay { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 24px; }
-.modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; width: 560px; max-width: 100%; padding: 28px 30px; box-shadow: 0 24px 60px var(--shadow); }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; width: 580px; max-width: 100%; padding: 28px 30px; box-shadow: 0 24px 60px var(--shadow); max-height: 86vh; overflow: auto; }
 .modal-title { font-size: 22px; font-weight: 600; }
 .modal-sub { font-size: 14px; color: var(--dim); margin-top: 4px; }
-.modal textarea {
-  width: 100%; margin-top: 16px; border: 1px solid var(--border); background: var(--bg);
-  color: var(--ink); border-radius: 10px; padding: 12px 14px; font-size: 14.5px;
-  line-height: 1.5; outline: none; resize: vertical; box-sizing: border-box;
-}
+.modal textarea { width: 100%; margin-top: 16px; border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 10px; padding: 12px 14px; font-size: 14.5px; line-height: 1.5; outline: none; resize: vertical; box-sizing: border-box; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; align-items: center; }
-.modal-actions .btn-plain, .modal-actions .btn { font-size: 14px; }
 .wait { display: flex; align-items: center; gap: 12px; padding: 18px 4px; }
 .wait span:last-child { font-size: 15px; color: var(--dim); }
 .suggest-list { display: flex; flex-direction: column; margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.suggest-item { display: flex; gap: 12px; align-items: center; padding: 11px 16px; border-top: 1px solid var(--line); margin-top: -1px; }
-.suggest-item .num { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--accent); width: 18px; }
-.suggest-item .txt { font-size: 14.5px; }
+.suggest-item { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border-top: 1px solid var(--line); margin-top: -1px; }
+.suggest-item:first-child { border-top: none; margin-top: 0; }
+.suggest-item .num { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--accent); width: 18px; margin-top: 1px; }
 .pick-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 .pick-list button { text-align: left; border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 10px; padding: 13px 16px; font-size: 14.5px; cursor: pointer; }
 .pick-list .p-name { font-weight: 600; }
@@ -273,12 +237,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .block-body { font-size: 14.5px; line-height: 1.55; color: var(--ink); margin-top: 4px; white-space: pre-line; }
 .modal-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
 .saved-note { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--faint); }
+.efield { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.efield label { font-size: 12.5px; color: var(--dim); font-family: 'JetBrains Mono', monospace; }
+.efield input, .efield select { border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 9px 12px; font-size: 14px; outline: none; box-sizing: border-box; }
+.efield-row { display: flex; gap: 12px; margin-top: 14px; }
+.efield-row .efield { flex: 1; margin-top: 0; }
 
-.toast {
-  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
-  background: var(--ink); color: var(--bg); border-radius: 999px; padding: 11px 22px;
-  font-size: 14px; box-shadow: 0 10px 28px var(--shadow); z-index: 60; white-space: nowrap;
-}
+.toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); border-radius: 999px; padding: 11px 22px; font-size: 14px; box-shadow: 0 10px 28px var(--shadow); z-index: 60; white-space: nowrap; }
+.empty { color: var(--faint); font-size: 14px; padding: 22px; }
 </style>
 </head>
 <body>
@@ -289,6 +255,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
       <div class="nav" id="nav"></div>
     </div>
     <div class="topbar-right">
+      <div id="daynav"></div>
       <div class="server" id="server" title="servidor llama.cpp local"><span class="dot"></span><span id="server-label"></span></div>
       <button class="icon-btn" id="theme-btn" title="alternar tema">☾</button>
     </div>
@@ -300,6 +267,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
     <div class="view" id="view-rev"></div>
     <div class="view" id="view-hist"></div>
   </div>
+  <div id="fab-root"></div>
   <div id="modal-root"></div>
   <div id="toast-root"></div>
 </div>
@@ -309,19 +277,19 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 // --- Estado ----------------------------------------------------------------
 const S = {
   view: 'hoje',
-  today: null, userName: '', model: '…', online: true,
+  today: null, viewDay: null, userName: '', model: '…', online: true,
   tasks: [], projects: [],
   histDay: null, histTasks: [],
   chat: [], chatThinking: false,
   review: { days: 14, metrics: null, assessment: '', thinking: false },
   modal: null,
   plan: { stage: 'input', text: '', suggested: [] },
-  cp: { stage: 'pick', projectId: null, text: '', blocks: [], name: '', goal: '' },
+  cp: { stage: 'pick', projectId: null, text: '', blocks: [], status: '', name: '', goal: '' },
   su: { stage: 'thinking', blocks: [], copied: false },
   np: { open: false, name: '', goal: '' },
+  edit: { id: null, project_id: '', tags: '', due: '', effort: '' },
 };
 const OFFLINE_MSG = 'Servidor offline — suba o llama.cpp com docker compose up -d';
-const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
 // --- Utilitários -----------------------------------------------------------
 function esc(s) {
@@ -329,8 +297,7 @@ function esc(s) {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   })[c]);
 }
-// Markdown inline mínimo para texto vindo do modelo. Converte SOBRE a string já
-// escapada — as únicas tags no resultado são as geradas aqui.
+// Markdown inline mínimo para texto do modelo. Converte SOBRE a string já escapada.
 function md(s) {
   let h = esc(s);
   h = h.replace(/```\w*\n?([\s\S]*?)```/g, (_, c) => '<code class="blk">' + c.replace(/\n$/, '') + '</code>');
@@ -347,18 +314,12 @@ function fmtLong(day) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 function fmtShort(day) {
-  const d = new Date(day + 'T12:00:00');
-  return String(d.getDate()).padStart(2, '0') + ' ' + MESES[d.getMonth()];
+  return new Date(day + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
 }
 function shiftDay(day, n) {
   const d = new Date(day + 'T12:00:00');
   d.setDate(d.getDate() + n);
   return d.toISOString().slice(0, 10);
-}
-function greeting() {
-  const h = new Date().getHours();
-  const g = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
-  return S.userName ? g + ', ' + S.userName : g;
 }
 let toastTimer = null;
 function toast(msg) {
@@ -370,6 +331,12 @@ function guardLLM() {
   if (!S.online) { toast(OFFLINE_MSG); return false; }
   return true;
 }
+function statusCls(tag) {
+  if (tag === 'no rumo') return 'sbadge ok';
+  if (tag === 'em risco' || tag === 'desviando') return 'sbadge risk';
+  return 'sbadge';
+}
+function projClass(id) { return 'c' + (((id % 6) + 6) % 6); }
 
 // --- API -------------------------------------------------------------------
 async function api(path, body) {
@@ -384,12 +351,14 @@ async function api(path, body) {
   return r.json();
 }
 async function loadState() {
-  const st = await api('/api/state');
+  const day = S.viewDay || '';
+  const st = await api('/api/state' + (day ? '?day=' + day : ''));
   S.today = st.today;
   S.userName = st.user_name;
   S.model = st.model;
   S.tasks = st.tasks;
   S.projects = st.projects;
+  if (!S.viewDay) S.viewDay = st.today;
   if (!S.histDay) S.histDay = st.today;
   render();
 }
@@ -422,6 +391,8 @@ document.getElementById('theme-btn').onclick = () =>
 function render() {
   renderNav();
   renderServer();
+  renderDaynav();
+  renderFab();
   for (const v of ['hoje', 'projetos', 'chat', 'rev', 'hist']) {
     document.getElementById('view-' + v).classList.toggle('active', S.view === v);
   }
@@ -434,12 +405,13 @@ function render() {
 }
 function go(view) {
   S.view = view;
+  if (view === 'hoje' && S.viewDay !== S.today) { S.viewDay = S.today; loadState(); }
   if (view === 'hist') loadHist();
   if (view === 'rev' && !S.review.metrics) loadReview();
   render();
 }
 function renderNav() {
-  const items = [['Hoje', 'hoje'], ['Projetos', 'projetos'], ['Chat', 'chat'], ['Análise', 'rev'], ['Histórico', 'hist']];
+  const items = [['Hoje', 'hoje'], ['Projetos', 'projetos'], ['Análise', 'rev'], ['Chat', 'chat'], ['Histórico', 'hist']];
   document.getElementById('nav').innerHTML = items.map(([label, key]) =>
     '<button class="' + (S.view === key ? 'active' : '') + '" onclick="go(\'' + key + '\')">' + label + '</button>'
   ).join('');
@@ -448,132 +420,140 @@ function renderServer() {
   document.getElementById('server').classList.toggle('off', !S.online);
   document.getElementById('server-label').textContent = S.online ? S.model : S.model + ' · offline';
 }
-function tagClass(tag) {
-  if (tag === 'no rumo') return 'tag ok';
-  if (tag === 'em risco' || tag === 'desviando') return 'tag risk';
-  return 'tag';
+function renderDaynav() {
+  const root = document.getElementById('daynav');
+  if (S.view !== 'hoje' || !S.viewDay) { root.innerHTML = ''; return; }
+  const isToday = S.viewDay >= S.today;
+  const lbl = S.viewDay === S.today ? 'hoje' : fmtShort(S.viewDay);
+  root.className = 'daynav';
+  root.innerHTML = '<button onclick="hojeShift(-1)">‹</button>'
+    + '<span class="lbl">' + lbl + '</span>'
+    + '<button style="color:' + (isToday ? 'var(--faint)' : 'var(--dim)') + ';" onclick="hojeShift(1)">›</button>';
 }
-function projClass(id) { return 'c' + (((id % 6) + 6) % 6); }
-function projSelectHtml(t, clickable) {
-  if (!clickable && !t.project_id) return '';
-  const options = S.projects.filter(p => p.active || p.id === t.project_id);
-  const opts = ['<option value="">projeto</option>']
-    .concat(options.map(p =>
-      '<option value="' + p.id + '"' + (p.id === t.project_id ? ' selected' : '') + '>' + esc(p.name) + '</option>'));
-  const cls = t.project_id ? projClass(t.project_id) : '';
-  return '<select class="proj-chip proj-select ' + cls + '" title="projeto"'
-    + (clickable ? ' onchange="setTaskProject(' + t.id + ', this.value)"' : ' disabled')
-    + '>' + opts.join('') + '</select>';
+function renderFab() {
+  document.getElementById('fab-root').innerHTML = (S.view === 'chat' || S.modal)
+    ? ''
+    : '<div class="fab" onclick="go(\'chat\')"><span class="dot"></span> Chat</div>';
 }
-function taskRow(t, clickable) {
+
+function taskRow(t, opts) {
+  opts = opts || {};
+  const act = !!opts.clickable, editable = !!opts.editable;
   const late = t.due && !t.done && t.due < S.today;
-  const chips = []
-    .concat([projSelectHtml(t, clickable)])
-    .concat((t.tags || []).map(tag => '<span class="tag">' + esc(tag) + '</span>'))
-    .concat(t.effort ? ['<span class="eff" title="esforço estimado">' + esc(t.effort) + '</span>'] : [])
-    .concat(t.due
-      ? ['<span class="due' + (late ? ' late' : '') + '" title="prazo ' + esc(t.due) + '">'
-        + fmtShort(t.due) + (late ? ' !' : '') + '</span>']
-      : [])
-    .filter(Boolean);
-  return '<div class="task-row' + (t.done ? ' done' : '') + '">'
-    + '<span class="checkbox' + (t.done ? ' checked' : '') + (clickable ? '' : ' static') + '"'
-    + (clickable ? ' onclick="toggleTask(' + t.id + ')"' : '') + '>' + (t.done ? '✓' : '') + '</span>'
-    + (t.priority != null
-      ? '<span class="prio' + (t.priority === 1 ? ' p1' : '') + '">P' + t.priority + '</span>' : '')
-    + '<span class="task-title' + (t.done ? ' done' : '') + '">' + esc(t.title) + '</span>'
-    + (chips.length ? '<span class="task-chips">' + chips.join('') + '</span>' : '')
+  const meta = []
+    .concat(t.effort ? ['<span class="m-eff" title="esforço estimado">' + esc(t.effort) + '</span>'] : [])
+    .concat(t.project_name ? ['<span class="m-proj">◇ ' + esc(t.project_name) + '</span>'] : [])
+    .concat((t.tags || []).map(g => '<span class="m-tag">#' + esc(g) + '</span>'))
+    .concat(t.due ? ['<span class="m-due' + (late ? ' late' : '') + '">' + fmtShort(t.due) + (late ? ' • atrasada' : '') + '</span>'] : []);
+  return '<div class="trow' + (t.done ? ' done' : '') + (editable ? ' editable' : '') + '"'
+    + (editable ? ' onclick="openTaskEdit(' + t.id + ')"' : '') + '>'
+    + '<span class="tcheck' + (t.done ? ' checked' : '') + (act ? ' act' : '') + '"'
+    + (act ? ' onclick="event.stopPropagation(); toggleTask(' + t.id + ')"' : '') + '>' + (t.done ? '✓' : '') + '</span>'
+    + (t.priority != null ? '<span class="tprio' + (t.priority === 1 ? ' p1' : '') + '">P' + t.priority + '</span>' : '')
+    + '<div class="tmain">'
+    + '<span class="ttitle' + (t.done ? ' done' : '') + '">' + esc(t.title) + '</span>'
+    + (meta.length ? '<div class="tmeta">' + meta.join('') + '</div>' : '')
+    + '</div></div>';
+}
+
+function projMini(p) {
+  const pctv = p.tasks.total ? Math.round(p.tasks.done / p.tasks.total * 100) : 0;
+  const late = p.deadline && p.active && p.deadline < S.today;
+  return '<div class="pmini">'
+    + '<div class="pmini-head"><span class="pmini-name">'
+    + '<span class="proj-dot ' + projClass(p.id) + '"></span><span class="txt">' + esc(p.name) + '</span></span>'
+    + '<span class="' + statusCls(p.tag) + '">' + esc(p.tag) + '</span></div>'
+    + '<div class="pbar-row"><div class="pbar"><div class="pbar-fill" style="width:' + pctv + '%"></div></div>'
+    + '<span class="pmini-prog">' + p.tasks.done + '/' + p.tasks.total + '</span></div>'
+    + (p.deadline ? '<div class="pmini-dl" style="' + (late ? 'color:var(--warn);' : '') + '">entrega: ' + fmtShort(p.deadline) + (late ? ' • vencido' : '') + '</div>' : '')
     + '</div>';
 }
 
 function renderHoje() {
   const done = S.tasks.filter(t => t.done).length;
   const active = S.projects.filter(p => p.active);
-  let html = '<div class="stack">';
-  html += '<div><div class="kicker">' + (S.today ? fmtLong(S.today) : '') + '</div>'
-    + '<div class="h1">' + esc(greeting()) + '</div></div>';
-  if (S.tasks.length === 0) {
-    html += '<div class="banner"><div>Você ainda não planejou o dia de hoje.</div>'
+  const isToday = S.viewDay === S.today;
+  let html = '<div class="cols">';
+
+  // Coluna esquerda: to-do
+  html += '<div class="col">';
+  html += '<div class="col-head"><div>'
+    + '<div class="kicker">' + (S.viewDay ? fmtLong(S.viewDay) : '') + '</div>'
+    + '<div class="col-title">' + (isToday ? 'To-do de hoje' : 'To-do de ' + fmtShort(S.viewDay)) + '</div></div>'
+    + '<div class="col-count">' + done + ' / ' + S.tasks.length + ' feitas</div></div>';
+  html += '<div class="card">'
+    + (S.tasks.length ? S.tasks.map(t => taskRow(t, { clickable: true, editable: true })).join('')
+      : '<div class="empty">Nenhuma tarefa neste dia. Adicione abaixo ou planeje com o modelo.</div>')
+    + '<div class="addbar">'
+    + '<input id="new-task" placeholder="Adicionar tarefa…  (Enter salva)" onkeydown="addTaskKey(event)">'
+    + '</div></div>';
+  if (!S.tasks.length && isToday) {
+    html += '<div class="banner"><span>Monte o to-do do dia conversando com o modelo.</span>'
       + '<button class="btn-primary" onclick="openPlan()">Planejar o dia</button></div>';
   }
-  html += '<div class="card card-list">'
-    + '<div class="card-head"><div class="card-title">To-do de hoje</div>'
-    + '<div class="card-count">' + done + ' / ' + S.tasks.length + ' feitas</div></div>'
-    + S.tasks.map(t => taskRow(t, true)).join('')
-    + '<div class="add-row">'
-    + '<input type="text" id="new-task" placeholder="Adicionar tarefa…  (Enter salva)" onkeydown="addTaskKey(event)">'
-    + '</div>'
-    + '<div class="add-opts">'
-    + '<select class="opt" id="new-project" title="projeto">'
-    + '<option value="">projeto</option>'
-    + active.map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('')
-    + '</select>'
-    + '<input type="text" class="opt" id="new-tags" placeholder="tags" title="tags separadas por vírgula" onkeydown="addTaskKey(event)">'
-    + '<input type="date" class="opt" id="new-due" title="prazo">'
-    + '<select class="opt" id="new-eff" title="esforço estimado">'
-    + '<option value="">esf</option><option>P</option><option>M</option><option>G</option></select>'
-    + '</div></div>';
-  html += '<div class="grid2">'
-    + '<div class="card card-pad"><div class="mini-head"><div class="mini-title">Projetos</div>'
+  html += '</div>';
+
+  // Coluna direita: sidebar
+  html += '<div class="col">';
+  html += '<div class="scard"><div class="scard-head"><div class="scard-title">Projetos</div>'
     + '<button class="btn-link" onclick="go(\'projetos\')">ver todos</button></div>'
-    + '<div class="chip-col">'
-    + (active.length
-      ? active.map(p => '<div class="chip-row"><span style="display:flex; align-items:center; gap:8px;">'
-        + '<span class="proj-dot ' + projClass(p.id) + '"></span>' + esc(p.name) + '</span>'
-        + '<span class="' + tagClass(p.tag) + '">' + esc(p.tag) + '</span></div>').join('')
-      : '<div class="hist-empty" style="padding:0; font-size:13px;">Nenhum projeto ativo.</div>')
-    + '</div></div>'
-    + '<div class="card card-pad"><div class="mini-title" style="margin-bottom:12px;">Ações rápidas</div>'
+    + (active.length ? active.map(projMini).join('')
+      : '<div class="empty" style="padding:0; font-size:13px;">Nenhum projeto ativo.</div>')
+    + '</div>';
+  html += '<div class="scard"><div class="scard-title">Ritual do dia</div>'
+    + '<div class="scard-sub">Standup da daily, checkpoint de projeto e análise da execução.</div>'
     + '<div class="quick">'
-    + '<button class="btn" onclick="openCheckpoint()">Checkpoint</button>'
     + '<button class="btn" onclick="openStandup()">Standup</button>'
-    + '<button class="btn" onclick="go(\'chat\')">Chat</button>'
-    + '</div></div></div>';
+    + '<button class="btn" onclick="openCheckpoint()">Checkpoint</button>'
+    + '<button class="btn" onclick="go(\'rev\')">Análise</button>'
+    + '</div></div>';
+  html += '</div>';
+
   html += '</div>';
   document.getElementById('view-hoje').innerHTML = html;
 }
 
 function renderProjetos() {
-  let html = '<div class="stack-md">';
-  html += '<div style="display:flex; justify-content:space-between; align-items:flex-end;">'
-    + '<div><div class="kicker">entregas acompanhadas por checkpoints</div>'
-    + '<div class="h2">Projetos</div></div>'
+  let html = '<div class="stackv">';
+  html += '<div class="page-head"><div>'
+    + '<div class="kicker">entregas acompanhadas por checkpoints</div>'
+    + '<div class="h-lg">Projetos</div></div>'
     + '<button class="btn" style="font-weight:600; padding:9px 16px;" onclick="toggleNp()">+ novo projeto</button></div>';
   if (S.np.open) {
     html += '<div class="np-form">'
       + '<input id="np-name" placeholder="Nome curto do projeto" value="' + esc(S.np.name) + '">'
       + '<input id="np-goal" placeholder="Objetivo da entrega (o que é \'pronto\')" value="' + esc(S.np.goal) + '">'
-      + '<input id="np-deadline" type="date" title="data-alvo da entrega (opcional)">'
+      + '<div style="display:flex; align-items:center; gap:10px;"><span style="font-size:13px; color:var(--dim);">Prazo da entrega</span>'
+      + '<input id="np-deadline" type="date" style="flex:0 0 auto;"></div>'
       + '<div class="np-actions"><button class="btn-plain" onclick="toggleNp()">Cancelar</button>'
       + '<button class="btn-primary" style="padding:9px 16px; font-size:13px;" onclick="saveNp()">Criar projeto</button></div></div>';
   }
   for (const p of S.projects) {
     const tl = p.timeline;
-    const projLate = p.deadline && p.active && p.deadline < S.today;
-    html += '<div class="proj-card' + (p.active ? '' : ' done') + '">'
-      + '<div class="proj-head"><span class="proj-name" style="display:flex; align-items:center; gap:9px;">'
+    const late = p.deadline && p.active && p.deadline < S.today;
+    html += '<div class="pcard' + (p.active ? '' : ' done') + '">'
+      + '<div class="pcard-head"><span class="pcard-name">'
       + '<span class="proj-dot ' + projClass(p.id) + '"></span>' + esc(p.name) + '</span>'
-      + '<span style="display:flex; gap:6px; align-items:center;">'
-      + (p.tasks.total
-        ? '<span class="due" title="tarefas do projeto">' + p.tasks.done + '/' + p.tasks.total + ' tarefas</span>' : '')
-      + (p.deadline
-        ? '<span class="due' + (projLate ? ' late' : '') + '" title="prazo da entrega">'
-          + fmtShort(p.deadline) + (projLate ? ' !' : '') + '</span>' : '')
-      + '<span class="' + tagClass(p.tag) + '" style="padding:3px 8px;">' + esc(p.tag) + '</span></span></div>'
-      + '<div class="proj-goal">' + esc(p.goal) + '</div>';
+      + '<span class="' + statusCls(p.tag) + '" style="padding:3px 8px;">' + esc(p.tag) + '</span></div>'
+      + '<div class="pcard-goal">' + esc(p.goal) + '</div>'
+      + '<div class="pcard-meta"><span>' + p.tasks.done + '/' + p.tasks.total + ' tarefas</span>'
+      + (p.deadline ? '<span style="' + (late ? 'color:var(--warn);' : '') + '">entrega ' + fmtShort(p.deadline) + (late ? ' • vencido' : '') + '</span>' : '')
+      + '</div>';
     if (tl.length) {
-      html += '<div class="timeline">' + tl.map((c, i) => {
+      html += '<div class="ptl">' + tl.map((c, i) => {
         const end = i === tl.length - 1;
-        return '<div class="tl-item"><div class="tl-rail">'
-          + '<span class="tl-dot' + (end ? ' last' : '') + '"></span>'
-          + '<span class="tl-line' + (end ? ' end' : '') + '"></span></div>'
-          + '<div class="tl-body' + (end ? ' end' : '') + '">'
-          + '<div class="tl-date">' + fmtShort(c.date) + ' · ' + esc(p.name) + '</div>'
-          + '<div class="tl-summary">' + esc(c.summary) + '</div></div></div>';
+        return '<div class="ptl-item"><div class="ptl-rail">'
+          + '<span class="ptl-dot' + (end ? ' last' : '') + '"></span>'
+          + '<span class="ptl-line' + (end ? ' end' : '') + '"></span></div>'
+          + '<div class="ptl-body' + (end ? ' end' : '') + '">'
+          + '<div class="ptl-top"><span class="ptl-date">' + fmtShort(c.date) + '</span>'
+          + (c.status ? '<span class="' + statusCls(c.status) + '" style="font-size:10.5px; padding:1px 6px;">' + esc(c.status) + '</span>' : '')
+          + '</div>'
+          + '<div class="ptl-sum">' + esc(c.summary) + '</div></div></div>';
       }).join('') + '</div>';
     }
     if (p.active) {
-      html += '<div class="proj-actions">'
+      html += '<div class="pcard-actions">'
         + '<button class="btn" onclick="openCheckpointFor(' + p.id + ')">Fazer checkpoint</button>'
         + '<button class="btn-plain" onclick="finishProject(' + p.id + ')">Concluir projeto</button></div>';
     }
@@ -587,7 +567,7 @@ function renderChat() {
   const active = S.projects.filter(p => p.active);
   let html = '<div class="chat-wrap">';
   html += '<div><div class="kicker">com o contexto de ' + S.tasks.length + ' tarefas · ' + active.length + ' projetos</div>'
-    + '<div class="h2">Chat</div></div>';
+    + '<div class="h-lg">Chat</div></div>';
   html += '<div class="chat-msgs">';
   if (!S.chat.length && !S.chatThinking) {
     html += '<div class="chat-empty">Pergunte sobre priorização, quebra de tarefas ou qualidade das entregas. O modelo enxerga suas tarefas e projetos.</div>';
@@ -612,13 +592,22 @@ function renderChat() {
 
 function pct(p) { return p == null ? '—' : Math.round(p * 100) + '%'; }
 function days_(v) { return v == null ? '—' : v + ' d'; }
+function assessBlocks(text) {
+  const parts = [];
+  const re = /\*\*(.+?)\*\*\s*([\s\S]*?)(?=\n\s*\*\*.+?\*\*|$)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m[2].trim()) parts.push({ title: m[1].trim(), body: m[2].trim() });
+  }
+  return parts.length ? parts : [{ title: '', body: text.trim() }];
+}
 function renderRev() {
   const m = S.review.metrics;
-  let html = '<div class="stack-md">';
-  html += '<div style="display:flex; justify-content:space-between; align-items:flex-end;">'
-    + '<div><div class="kicker">execução dos últimos ' + S.review.days + ' dias</div>'
-    + '<div class="h2">Análise</div></div>'
-    + '<div class="range-btns">' + [7, 14, 30].map(n =>
+  let html = '<div class="stackv">';
+  html += '<div class="page-head"><div>'
+    + '<div class="kicker">execução dos últimos ' + S.review.days + ' dias</div>'
+    + '<div class="h-lg">Análise da execução</div></div>'
+    + '<div class="seg">' + [7, 14, 30].map(n =>
       '<button class="' + (S.review.days === n ? 'active' : '') + '" onclick="setRevDays(' + n + ')">' + n + 'd</button>'
     ).join('') + '</div></div>';
   if (!m) {
@@ -627,77 +616,99 @@ function renderRev() {
     return;
   }
   const late = m.overdue.length;
-  html += '<div class="mgrid">'
-    + '<div class="mcard"><div class="mval">' + m.done + ' / ' + m.total + '</div><div class="mlabel">concluídas no período</div></div>'
-    + '<div class="mcard"><div class="mval' + (late ? ' bad' : '') + '">' + late + '</div><div class="mlabel">atrasadas agora</div></div>'
-    + '<div class="mcard"><div class="mval">' + pct(m.on_time_rate) + '</div><div class="mlabel">entrega no prazo</div></div>'
-    + '<div class="mcard"><div class="mval">' + pct(m.unplanned_rate) + '</div><div class="mlabel">não planejado</div></div>'
-    + '<div class="mcard"><div class="mval">' + pct(m.carryover_rate) + '</div><div class="mlabel">viraram o dia</div></div>'
-    + '<div class="mcard"><div class="mval">' + days_(m.avg_lead_days) + '</div><div class="mlabel">lead time médio</div></div>'
-    + '<div class="mcard"><div class="mval">' + m.throughput_per_week + '</div><div class="mlabel">concluídas/semana</div></div>'
-    + '</div>';
+  const cards = [
+    [m.done + ' / ' + m.total, 'concluídas no período', false],
+    [String(late), 'atrasadas agora', !!late],
+    [pct(m.on_time_rate), 'entrega no prazo', false],
+    [pct(m.unplanned_rate), 'não planejado', false],
+    [pct(m.carryover_rate), 'viraram o dia', false],
+    [days_(m.avg_lead_days), 'lead time médio', false],
+    [String(m.throughput_per_week), 'concluídas/semana', false],
+  ];
+  html += '<div class="mgrid">' + cards.map(([v, l, bad]) =>
+    '<div class="mcard"><div class="mval' + (bad ? ' bad' : '') + '">' + v + '</div><div class="mlabel">' + l + '</div></div>'
+  ).join('') + '</div>';
+
   const max = Math.max(1, ...m.done_per_day.map(d => d.done));
-  html += '<div class="card card-pad"><div class="mini-title" style="margin-bottom:4px;">Concluídas por dia</div>'
-    + '<div class="chart">' + m.done_per_day.map(d =>
-      '<div class="bar' + (d.done ? '' : ' zero') + '" style="height:' + Math.max(2, d.done / max * 100) + '%"'
-      + ' title="' + esc(d.day) + ': ' + d.done + '"></div>').join('') + '</div>'
-    + '<div class="chart-days">' + m.done_per_day.map(d => '<span>' + d.day.slice(8) + '</span>').join('') + '</div>'
+  html += '<div class="scard"><div class="rtable-title">Tarefas concluídas por dia</div>'
+    + '<div class="spark">' + m.done_per_day.map(d => {
+      const h = d.done ? Math.max(4, Math.round(d.done / max * 80)) : 3;
+      return '<div class="spark-col" title="' + esc(d.day) + ': ' + d.done + '">'
+        + '<div class="spark-bar" style="height:' + h + 'px; background:' + (d.done ? 'var(--accent)' : 'var(--chip)') + ';"></div>'
+        + '<span class="spark-tick">' + d.day.slice(8) + '</span></div>';
+    }).join('') + '</div></div>';
+
+  // Por esforço + por tag lado a lado
+  html += '<div class="tables">';
+  html += '<div class="rtable"><div class="rtable-title">Por esforço estimado</div>'
+    + '<div class="rt-head"><span style="width:40px;">Esf</span><span style="flex:1;">Tarefas</span>'
+    + '<span style="width:64px; text-align:right;">Concl.</span><span style="width:80px; text-align:right;">Lead méd.</span></div>'
+    + (Object.keys(m.by_effort).length ? Object.entries(m.by_effort).map(([lvl, s]) =>
+      '<div class="rt-row"><span class="mono" style="width:40px; font-weight:600;">' + lvl + '</span>'
+      + '<span style="flex:1; color:var(--dim);">' + s.total + '</span>'
+      + '<span style="width:64px; text-align:right; color:var(--dim);">' + s.done + '</span>'
+      + '<span style="width:80px; text-align:right;" class="mono">' + days_(s.avg_lead_days) + '</span></div>').join('')
+      : '<div class="empty" style="padding:12px 0; font-size:13px;">Sem esforço estimado no período.</div>')
     + '</div>';
-  if (late) {
-    html += '<div class="card card-list"><div class="card-head"><div class="card-title">Tarefas atrasadas</div></div>'
-      + '<div class="rev-rows">' + m.overdue.map(t =>
-        '<div class="rev-row"><span class="grow">' + esc(t.title) + '</span>'
-        + '<span class="num bad">' + esc(t.due) + '</span></div>').join('') + '</div></div>';
-  }
-  if (Object.keys(m.by_effort).length) {
-    html += '<div class="card card-list"><div class="card-head"><div class="card-title">Por esforço estimado</div>'
-      + '<div class="card-count">tarefas · concluídas · lead médio</div></div>'
-      + '<div class="rev-rows">' + Object.entries(m.by_effort).map(([level, s]) =>
-        '<div class="rev-row"><span class="eff">' + level + '</span><span class="grow"></span>'
-        + '<span class="num">' + s.total + ' · ' + s.done + ' · ' + days_(s.avg_lead_days) + '</span></div>').join('')
-      + '</div></div>';
-  }
-  if (Object.keys(m.by_tag).length) {
-    html += '<div class="card card-list"><div class="card-head"><div class="card-title">Por tag</div>'
-      + '<div class="card-count">tarefas · concluídas · atrasadas · lead médio</div></div>'
-      + '<div class="rev-rows">' + Object.entries(m.by_tag).map(([tag, s]) =>
-        '<div class="rev-row"><span class="tag">' + esc(tag) + '</span><span class="grow"></span>'
-        + '<span class="num' + (s.overdue ? ' bad' : '') + '">' + s.total + ' · ' + s.done + ' · ' + s.overdue + ' · ' + days_(s.avg_lead_days) + '</span></div>').join('')
-      + '</div></div>';
-  }
+  html += '<div class="rtable"><div class="rtable-title">Por tag</div>'
+    + '<div class="rt-head"><span style="flex:1;">Tag</span><span style="width:56px; text-align:right;">Tot.</span>'
+    + '<span style="width:56px; text-align:right;">Concl.</span><span style="width:64px; text-align:right;">Atras.</span></div>'
+    + (Object.keys(m.by_tag).length ? Object.entries(m.by_tag).map(([tag, s]) =>
+      '<div class="rt-row"><span style="flex:1;"><span class="m-tag">#' + esc(tag) + '</span></span>'
+      + '<span style="width:56px; text-align:right; color:var(--dim);">' + s.total + '</span>'
+      + '<span style="width:56px; text-align:right; color:var(--dim);">' + s.done + '</span>'
+      + '<span style="width:64px; text-align:right;' + (s.overdue ? ' color:var(--warn);' : '') + '" class="mono">' + s.overdue + '</span></div>').join('')
+      : '<div class="empty" style="padding:12px 0; font-size:13px;">Nenhuma tag no período.</div>')
+    + '</div>';
+  html += '</div>';
+
+  // Por projeto (largura total)
   if (Object.keys(m.by_project).length) {
-    html += '<div class="card card-list"><div class="card-head"><div class="card-title">Por projeto</div>'
-      + '<div class="card-count">tarefas · concluídas · atrasadas · lead médio</div></div>'
-      + '<div class="rev-rows">' + Object.entries(m.by_project).map(([pid, s]) =>
-        '<div class="rev-row"><span class="proj-chip ' + projClass(Number(pid)) + '">' + esc(s.name) + '</span><span class="grow"></span>'
-        + '<span class="num' + (s.overdue ? ' bad' : '') + '">' + s.total + ' · ' + s.done + ' · ' + s.overdue + ' · ' + days_(s.avg_lead_days) + '</span></div>').join('')
-      + '</div></div>';
+    html += '<div class="rtable"><div class="rtable-title">Por projeto</div>'
+      + '<div class="rt-head"><span style="flex:1;">Projeto</span><span style="width:56px; text-align:right;">Tot.</span>'
+      + '<span style="width:56px; text-align:right;">Concl.</span><span style="width:64px; text-align:right;">Atras.</span>'
+      + '<span style="width:80px; text-align:right;">Lead méd.</span></div>'
+      + Object.entries(m.by_project).map(([pid, s]) =>
+        '<div class="rt-row"><span style="flex:1;"><span class="proj-chip ' + projClass(Number(pid)) + '">' + esc(s.name) + '</span></span>'
+        + '<span style="width:56px; text-align:right; color:var(--dim);">' + s.total + '</span>'
+        + '<span style="width:56px; text-align:right; color:var(--dim);">' + s.done + '</span>'
+        + '<span style="width:64px; text-align:right;' + (s.overdue ? ' color:var(--warn);' : '') + '" class="mono">' + s.overdue + '</span>'
+        + '<span style="width:80px; text-align:right;" class="mono">' + days_(s.avg_lead_days) + '</span></div>').join('')
+      + '</div>';
   }
-  html += '<div class="card card-list"><div class="card-head"><div class="card-title">Avaliação do modelo</div>'
-    + (S.review.thinking
-      ? '<span class="spinner"></span>'
-      : '<button class="btn-link" onclick="runAssess()">' + (S.review.assessment ? 'reavaliar' : 'avaliar período') + '</button>')
-    + '</div>'
-    + (S.review.assessment ? '<div class="assess">' + md(S.review.assessment) + '</div>'
-      : '<div class="hist-empty" style="padding:4px 22px 16px;">O modelo aponta onde a execução está pecando e o que ajustar.</div>')
+
+  // Avaliação do modelo
+  html += '<div class="assess-panel"><div class="assess-head">'
+    + '<div class="assess-title">Avaliação do modelo</div>'
+    + (S.review.thinking ? '' : '<button class="btn-primary" onclick="runAssess()">' + (S.review.assessment ? 'Reavaliar' : 'Avaliar período') + '</button>')
     + '</div>';
+  if (S.review.thinking) {
+    html += '<div class="wait" style="padding:6px 0;"><span class="spinner acc"></span><span style="color:var(--accent-text);">Analisando o período…</span></div>';
+  } else if (S.review.assessment) {
+    html += '<div class="ablocks">' + assessBlocks(S.review.assessment).map(b =>
+      '<div>' + (b.title ? '<div class="ablock-title">' + esc(b.title) + '</div>' : '')
+      + '<div class="ablock-body">' + md(b.body) + '</div></div>').join('') + '</div>';
+  } else {
+    html += '<div class="assess-sub">Peça ao modelo uma leitura franca do período a partir das métricas acima.</div>';
+  }
+  html += '</div>';
+
   html += '</div>';
   document.getElementById('view-rev').innerHTML = html;
 }
 
 function renderHist() {
   const isToday = S.histDay === S.today;
-  let html = '<div class="stack-md">';
-  html += '<div><div class="kicker">to-dos de dias anteriores</div><div class="h2">Histórico</div></div>';
-  html += '<div class="hist-nav">'
+  let html = '<div class="stackv">';
+  html += '<div><div class="kicker">to-dos de dias anteriores</div><div class="h-lg">Histórico</div></div>';
+  html += '<div style="display:flex; align-items:center; gap:10px;">'
     + '<button class="icon-btn" onclick="histShift(-1)">‹</button>'
-    + '<span class="label">' + (S.histDay ? fmtLong(S.histDay) : '') + '</span>'
+    + '<span class="mono" style="font-size:14px; min-width:220px; text-align:center;">' + (S.histDay ? fmtLong(S.histDay) : '') + '</span>'
     + '<button class="icon-btn" style="color:' + (isToday ? 'var(--faint)' : 'var(--dim)') + ';" onclick="histShift(1)">›</button>'
     + '</div>';
-  html += '<div class="card card-list">'
-    + (S.histTasks.length
-      ? S.histTasks.map(t => taskRow(t, isToday)).join('')
-      : '<div class="hist-empty">Nenhuma tarefa registrada neste dia.</div>')
+  html += '<div class="card">'
+    + (S.histTasks.length ? S.histTasks.map(t => taskRow(t, { clickable: false, editable: false })).join('')
+      : '<div class="empty">Nenhuma tarefa registrada neste dia.</div>')
     + '</div>';
   html += '</div>';
   document.getElementById('view-hist').innerHTML = html;
@@ -709,33 +720,51 @@ async function toggleTask(id) {
     await api('/api/tasks/' + id + '/toggle', {});
     S.review.metrics = null;
     await loadState();
-    if (S.view === 'hist') await loadHist();
-  } catch (e) { toast(e.message); }
-}
-async function setTaskProject(id, value) {
-  const project_id = value ? Number(value) : null;
-  try {
-    await api('/api/tasks/' + id + '/project', { project_id });
-    S.review.metrics = null;
-    await loadState();
-    if (S.view === 'hist') await loadHist();
   } catch (e) { toast(e.message); }
 }
 async function addTaskKey(ev) {
   if (ev.key !== 'Enter') return;
-  const title = document.getElementById('new-task').value.trim();
+  const el = document.getElementById('new-task');
+  const title = el.value.trim();
   if (!title) return;
-  const tags = document.getElementById('new-tags').value.split(',').map(t => t.trim()).filter(Boolean);
-  const due = document.getElementById('new-due').value || null;
-  const effort = document.getElementById('new-eff').value || null;
-  const projectVal = document.getElementById('new-project').value;
-  const project_id = projectVal ? Number(projectVal) : null;
   try {
-    await api('/api/tasks', { title, tags, due_date: due, effort, project_id });
+    await api('/api/tasks', { title });
     S.review.metrics = null;
     await loadState();
-    document.getElementById('new-task').focus();
+    const again = document.getElementById('new-task');
+    if (again) again.focus();
   } catch (e) { toast(e.message); }
+}
+function openTaskEdit(id) {
+  const t = S.tasks.find(x => x.id === id);
+  if (!t) return;
+  S.edit = {
+    id: t.id,
+    project_id: t.project_id || '',
+    tags: (t.tags || []).join(', '),
+    due: t.due || '',
+    effort: t.effort || '',
+  };
+  S.modal = 'edit';
+  render();
+}
+async function saveTaskEdit() {
+  const projectVal = document.getElementById('edit-project').value;
+  const project_id = projectVal ? Number(projectVal) : null;
+  const tags = document.getElementById('edit-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+  const due_date = document.getElementById('edit-due').value || null;
+  const effort = document.getElementById('edit-eff').value || null;
+  try {
+    await api('/api/tasks/' + S.edit.id, { project_id, tags, due_date, effort });
+    S.modal = null;
+    S.review.metrics = null;
+    await loadState();
+  } catch (e) { toast(e.message); }
+}
+function hojeShift(n) {
+  if (n > 0 && S.viewDay >= S.today) return;
+  S.viewDay = shiftDay(S.viewDay, n);
+  loadState();
 }
 
 // --- Ações: projetos -------------------------------------------------------
@@ -796,6 +825,7 @@ async function savePlan() {
   try {
     await api('/api/plan/save', { tasks: S.plan.suggested });
     S.modal = null;
+    S.review.metrics = null;
     await loadState();
   } catch (e) { toast(e.message); }
 }
@@ -807,9 +837,9 @@ function openCheckpoint() {
   if (!active.length) { toast('Cadastre um projeto antes de fazer checkpoint.'); return; }
   S.modal = 'checkpoint';
   if (active.length === 1) {
-    S.cp = { stage: 'input', projectId: active[0].id, name: active[0].name, goal: active[0].goal, text: '', blocks: [] };
+    S.cp = { stage: 'input', projectId: active[0].id, name: active[0].name, goal: active[0].goal, text: '', blocks: [], status: '' };
   } else {
-    S.cp = { stage: 'pick', projectId: null, name: '', goal: '', text: '', blocks: [] };
+    S.cp = { stage: 'pick', projectId: null, name: '', goal: '', text: '', blocks: [], status: '' };
   }
   render();
 }
@@ -817,7 +847,7 @@ function openCheckpointFor(id) {
   if (!guardLLM()) return;
   const p = S.projects.find(p => p.id === id);
   S.modal = 'checkpoint';
-  S.cp = { stage: 'input', projectId: p.id, name: p.name, goal: p.goal, text: '', blocks: [] };
+  S.cp = { stage: 'input', projectId: p.id, name: p.name, goal: p.goal, text: '', blocks: [], status: '' };
   render();
 }
 function pickCp(id) {
@@ -836,6 +866,7 @@ async function runCp() {
   try {
     const r = await api('/api/checkpoint', { project_id: S.cp.projectId, progress: S.cp.text });
     S.cp.blocks = r.blocks;
+    S.cp.status = r.status || '';
     S.cp.stage = 'result';
     render();
     loadState();
@@ -877,27 +908,43 @@ function renderModal() {
     if (S.plan.stage === 'input') {
       inner = '<div class="modal-title">Planejar o dia</div>'
         + '<div class="modal-sub">O que você tem para hoje? (reuniões, entregas, pendências)</div>'
-        + '<textarea id="plan-text" rows="5" placeholder="Ex.: demo da sprint às 15h, terminar o rate limiting, o PR de auth ainda está aberto…">' + esc(S.plan.text) + '</textarea>'
+        + '<textarea id="plan-text" rows="5" placeholder="Ex.: demo da sprint às 15h, terminar o rate limiting até sexta, o PR de auth ainda está aberto…">' + esc(S.plan.text) + '</textarea>'
         + '<div class="modal-actions"><button class="btn-plain" onclick="closeModal()">Cancelar</button>'
         + '<button class="btn-primary" onclick="runPlan()">Planejar com o modelo</button></div>';
     } else if (S.plan.stage === 'thinking') {
       inner = '<div class="wait"><span class="spinner lg"></span><span>Planejando o dia…</span></div>';
     } else {
       inner = '<div class="modal-title">Sugestão de to-do</div>'
-        + '<div class="modal-sub" style="font-size:13.5px;">Gerada pelo modelo a partir do seu relato e dos projetos ativos.</div>'
+        + '<div class="modal-sub" style="font-size:13.5px;">Gerada pelo modelo com prioridade, prazo, esforço e tags.</div>'
         + '<div class="suggest-list">' + S.plan.suggested.map(s => {
-          const chips = []
-            .concat((s.tags || []).map(tag => '<span class="tag">' + esc(tag) + '</span>'))
-            .concat(s.effort ? ['<span class="eff">' + esc(s.effort) + '</span>'] : [])
-            .concat(s.due_date ? ['<span class="due">' + fmtShort(s.due_date) + '</span>'] : []);
+          const meta = []
+            .concat(s.effort ? ['<span class="m-eff">' + esc(s.effort) + '</span>'] : [])
+            .concat((s.tags || []).map(g => '<span class="m-tag">#' + esc(g) + '</span>'))
+            .concat(s.due_date ? ['<span class="m-due">' + fmtShort(s.due_date) + '</span>'] : []);
           return '<div class="suggest-item"><span class="num">' + s.priority + '.</span>'
-            + '<span class="txt" style="flex:1;">' + esc(s.title) + '</span>'
-            + (chips.length ? '<span class="task-chips">' + chips.join('') + '</span>' : '')
-            + '</div>';
+            + '<div class="tmain"><span class="ttitle">' + esc(s.title) + '</span>'
+            + (meta.length ? '<div class="tmeta">' + meta.join('') + '</div>' : '') + '</div></div>';
         }).join('') + '</div>'
         + '<div class="modal-actions" style="margin-top:18px;"><button class="btn-plain" onclick="closeModal()">Descartar</button>'
         + '<button class="btn-primary" onclick="savePlan()">Salvar no to-do de hoje</button></div>';
     }
+  } else if (S.modal === 'edit') {
+    const active = S.projects.filter(p => p.active || p.id === S.edit.project_id);
+    inner = '<div class="modal-title">Editar tarefa</div>'
+      + '<div class="modal-sub" style="font-size:13.5px;">Projeto, tags, prazo e esforço.</div>'
+      + '<div class="efield"><label>Projeto</label>'
+      + '<select id="edit-project"><option value="">— sem projeto —</option>'
+      + active.map(p => '<option value="' + p.id + '"' + (p.id === S.edit.project_id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('')
+      + '</select></div>'
+      + '<div class="efield"><label>Tags (separadas por vírgula)</label>'
+      + '<input id="edit-tags" placeholder="ex.: bug, dados" value="' + esc(S.edit.tags) + '"></div>'
+      + '<div class="efield-row">'
+      + '<div class="efield"><label>Prazo</label><input id="edit-due" type="date" value="' + esc(S.edit.due) + '"></div>'
+      + '<div class="efield"><label>Esforço</label><select id="edit-eff">'
+      + ['', 'P', 'M', 'G'].map(v => '<option value="' + v + '"' + (v === S.edit.effort ? ' selected' : '') + '>' + (v || '—') + '</option>').join('')
+      + '</select></div></div>'
+      + '<div class="modal-actions" style="margin-top:20px;"><button class="btn-plain" onclick="closeModal()">Cancelar</button>'
+      + '<button class="btn-primary" onclick="saveTaskEdit()">Salvar</button></div>';
   } else if (S.modal === 'checkpoint') {
     if (S.cp.stage === 'pick') {
       const active = S.projects.filter(p => p.active);
@@ -916,7 +963,9 @@ function renderModal() {
     } else if (S.cp.stage === 'thinking') {
       inner = '<div class="wait"><span class="spinner lg"></span><span>Avaliando progresso…</span></div>';
     } else {
-      inner = '<div class="modal-title">Avaliação — ' + esc(S.cp.name) + '</div>'
+      inner = '<div style="display:flex; align-items:center; gap:12px;">'
+        + '<div class="modal-title">Avaliação — ' + esc(S.cp.name) + '</div>'
+        + (S.cp.status ? '<span class="' + statusCls(S.cp.status) + '">' + esc(S.cp.status) + '</span>' : '') + '</div>'
         + '<div class="blocks">' + S.cp.blocks.map(b =>
           '<div><div class="block-title">' + esc(b.title) + '</div>'
           + '<div class="block-body">' + esc(b.body) + '</div></div>').join('') + '</div>'

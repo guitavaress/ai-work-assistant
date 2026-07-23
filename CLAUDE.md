@@ -12,7 +12,7 @@ Assistente pessoal de trabalho com modelos locais via llama.cpp. CLI `wa` em Pyt
 - `src/work_assistant/context.py` — monta os blocos de contexto (tarefas/projetos/checkpoints) injetados nos prompts.
 - `src/work_assistant/prompts/*.md` — prompts em PT-BR, um por comando. Ajustes de comportamento do modelo acontecem AQUI, não no código.
 - `src/work_assistant/commands/` — um módulo por comando. `todo` e `project` funcionam sem LLM; `plan`, `checkpoint`, `standup`, `chat` e `review` exigem o servidor de pé (o `review` só para a avaliação — as métricas são locais).
-- `src/work_assistant/web/` — interface web (`wa web`): `api.py` (FastAPI, camada fina sobre `services.py`/`db.py`) + `static/index.html` (frontend vanilla JS em arquivo único, sem build). O design de referência vive no projeto "WA App" do Claude Design.
+- `src/work_assistant/web/` — interface web (`wa web`): `api.py` (FastAPI, camada fina sobre `services.py`/`db.py`) + `static/index.html` (frontend vanilla JS em arquivo único, sem build). Layout "cockpit" (duas colunas, 1160px): Hoje com to-do + sidebar (projetos com barra de progresso, ritual do dia) e day-nav no topo; clicar numa tarefa abre popover de edição (projeto/tags/prazo/esforço) via `POST /api/tasks/{id}`. O design de referência é o `WA App Cockpit.dc.html` no projeto Claude Design "Interface visual para projeto" (protótipo declarativo `.dc.html`, não executável).
 - `docker/docker-compose.yml` — servidor llama.cpp (Qwen3.5 4B, otimizado p/ RTX 3050 4GB) + profile `quality` (Qwen3.5 9B, porta 8081).
 
 ## Comandos de desenvolvimento

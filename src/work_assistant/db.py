@@ -273,6 +273,15 @@ def set_task_tags(
     return get_task(conn, task_id)
 
 
+def set_task_effort(conn: sqlite3.Connection, task_id: int, effort: str | None) -> Task:
+    get_task(conn, task_id)
+    conn.execute(
+        "UPDATE tasks SET effort = ? WHERE id = ?", (validate_effort(effort), task_id)
+    )
+    conn.commit()
+    return get_task(conn, task_id)
+
+
 def set_task_project(
     conn: sqlite3.Connection, task_id: int, project_id: int | None
 ) -> Task:

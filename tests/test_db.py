@@ -101,6 +101,14 @@ def test_add_task_with_project(conn):
         db.add_task(conn, "x", project_id=999)
 
 
+def test_set_task_effort(conn):
+    task = db.add_task(conn, "Ajustar job")
+    assert db.set_task_effort(conn, task.id, "g").effort == "G"
+    assert db.set_task_effort(conn, task.id, None).effort is None
+    with pytest.raises(ValueError):
+        db.set_task_effort(conn, task.id, "XG")
+
+
 def test_set_task_project(conn):
     p = db.add_project(conn, "API v2", "Publicar API v2")
     task = db.add_task(conn, "sem projeto")

@@ -64,6 +64,13 @@ class TaskProjectIn(BaseModel):
     project_id: int | None = None
 
 
+class TaskEditIn(BaseModel):
+    project_id: int | None = None
+    tags: list[str] = []
+    due_date: str | None = None
+    effort: str | None = None
+
+
 def _project_map(conn) -> dict[int, str]:
     return {p.id: p.name for p in db.list_projects(conn, include_done=True)}
 
@@ -108,6 +115,7 @@ def _project_out(conn, p: db.Project) -> dict:
         "timeline": [
             {
                 "date": c.created_at[:10],
+                "status": c.status,
                 "summary": c.summary or c.assessment.split("\n")[0][:100],
             }
             for c in checkpoints
@@ -187,6 +195,23 @@ def set_task_project(task_id: int, body: TaskProjectIn):
     conn = db.connect()
     try:
         task = db.set_task_project(conn, task_id, body.project_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return _task_out(task, _project_map(conn))
+
+
+@app.post("/api/tasks/{task_id}")
+def edit_task(task_id: int, body: TaskEditIn):
+    """Atualiza projeto, tags, prazo e esforço de uma tarefa (popover de edição da web)."""
+    conn = db.connect()
+    try:
+        db.get_task(conn, task_id)
+        db.set_task_project(conn, task_id, body.project_id)
+        db.set_task_tags(conn, task_id, body.tags)
+        db.set_task_due(conn, task_id, body.due_date or None)
+        task = db.set_task_effort(conn, task_id, body.effort or None)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return _task_out(task, _project_map(conn))
