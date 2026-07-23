@@ -16,6 +16,9 @@ body {
   --accent-soft:#EDF3EE; --accent-border:#CFE0D4; --accent-text:#2A4A3A;
   --chip:#EFECE3; --p1bg:#F6E8DE; --p1ink:#8A4B2D; --btn:#F3F0E9;
   --ok:#3E9B6B; --warn:#C2542E; --overlay:rgba(20,19,16,0.45); --shadow:rgba(28,27,24,0.08);
+  --pc0bg:#F6E8DE; --pc0ink:#8A4B2D; --pc1bg:#E3EDF7; --pc1ink:#2D5C8A;
+  --pc2bg:#F0E8F7; --pc2ink:#6B3D8A; --pc3bg:#E8F3E9; --pc3ink:#3D7A45;
+  --pc4bg:#FBEBE3; --pc4ink:#A04A2E; --pc5bg:#EAF0F1; --pc5ink:#3D6B70;
 }
 body.dark {
   --bg:#171612; --card:#201E19; --border:#34312A; --line:#2A2822; --ink:#F0EDE5;
@@ -23,6 +26,9 @@ body.dark {
   --accent-soft:#1E2A23; --accent-border:#2E4A3B; --accent-text:#A8D5BC;
   --chip:#2A2822; --p1bg:#3A2417; --p1ink:#E5A583; --btn:#262420;
   --ok:#4FBF85; --warn:#E07B52; --overlay:rgba(0,0,0,0.55); --shadow:rgba(0,0,0,0.35);
+  --pc0bg:#3A2417; --pc0ink:#E5A583; --pc1bg:#1E2E3D; --pc1ink:#8FBBDD;
+  --pc2bg:#2D2038; --pc2ink:#C8A3DD; --pc3bg:#1E2E22; --pc3ink:#8FCB9C;
+  --pc4bg:#3A2019; --pc4ink:#E5A088; --pc5bg:#1C2A2B; --pc5ink:#8FC0C4;
 }
 a { color: var(--accent); } a:hover { opacity: 0.8; }
 input, textarea, button { font-family: inherit; }
@@ -102,10 +108,28 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   color: var(--dim); background: var(--chip); padding: 2px 7px; border-radius: 5px;
 }
 .prio.p1 { color: var(--p1ink); background: var(--p1bg); }
+.eff {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+  color: var(--dim); border: 1px solid var(--border); padding: 1px 6px; border-radius: 5px;
+}
+.due {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim);
+  background: var(--chip); padding: 2px 7px; border-radius: 5px; white-space: nowrap;
+}
+.due.late { color: var(--p1ink); background: var(--p1bg); font-weight: 600; }
 .task-title { font-size: 15px; flex: 1; }
 .task-title.done { text-decoration: line-through; }
-.add-row { padding: 12px 22px; border-top: 1px solid var(--line); }
-.add-row input { width: 100%; border: none; background: transparent; font-size: 15px; color: var(--ink); outline: none; box-sizing: border-box; }
+.task-chips { display: flex; gap: 6px; align-items: center; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; max-width: 55%; }
+.add-row { padding: 14px 22px 6px; border-top: 1px solid var(--line); display: flex; }
+.add-row input#new-task { flex: 1; border: none; background: transparent; font-size: 15px; color: var(--ink); outline: none; box-sizing: border-box; min-width: 0; }
+.add-opts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 22px 14px; }
+.add-opts .opt {
+  border: 1px solid var(--border); background: var(--bg); color: var(--dim);
+  border-radius: 6px; padding: 5px 9px; font-size: 12px; outline: none;
+  font-family: 'JetBrains Mono', monospace;
+}
+.add-opts input.opt::-webkit-calendar-picker-indicator { opacity: 0.5; }
+.add-opts input.opt[type=text] { flex: 1 1 130px; min-width: 100px; }
 
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .mini-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -119,6 +143,35 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .tag.ok { color: var(--accent); background: var(--accent-soft); }
 .tag.risk { color: var(--warn); background: var(--p1bg); }
+.proj-chip {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+  padding: 2px 7px; border-radius: 5px; white-space: nowrap;
+  background: var(--chip); color: var(--dim);
+}
+.proj-select {
+  border: none; outline: none; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  max-width: 130px; text-overflow: ellipsis;
+  padding: 2px 17px 2px 8px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%23888' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 6px center;
+}
+.proj-select:disabled {
+  cursor: default; opacity: 0.7; background-image: none; padding-right: 8px;
+}
+.proj-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.proj-chip.c0 { background: var(--pc0bg); color: var(--pc0ink); }
+.proj-chip.c1 { background: var(--pc1bg); color: var(--pc1ink); }
+.proj-chip.c2 { background: var(--pc2bg); color: var(--pc2ink); }
+.proj-chip.c3 { background: var(--pc3bg); color: var(--pc3ink); }
+.proj-chip.c4 { background: var(--pc4bg); color: var(--pc4ink); }
+.proj-chip.c5 { background: var(--pc5bg); color: var(--pc5ink); }
+.proj-dot.c0 { background: var(--pc0ink); }
+.proj-dot.c1 { background: var(--pc1ink); }
+.proj-dot.c2 { background: var(--pc2ink); }
+.proj-dot.c3 { background: var(--pc3ink); }
+.proj-dot.c4 { background: var(--pc4ink); }
+.proj-dot.c5 { background: var(--pc5ink); }
 .quick { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .proj-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; }
@@ -151,6 +204,11 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .bubble { max-width: 78%; padding: 12px 16px; font-size: 14.5px; line-height: 1.55; white-space: pre-wrap; }
 .bubble.user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 14px 14px 4px 14px; }
 .bubble.bot { align-self: flex-start; background: var(--card); color: var(--ink); border: 1px solid var(--border); border-radius: 14px 14px 14px 4px; }
+.bubble code, .block-body code {
+  font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+  background: var(--chip); border-radius: 4px; padding: 1px 5px;
+}
+.bubble code.blk { display: block; padding: 8px 10px; margin: 4px 0; white-space: pre-wrap; overflow-x: auto; }
 .thinking { align-self: flex-start; display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 13px; padding: 6px 2px; }
 .spinner { width: 14px; height: 14px; border: 2px solid var(--chip); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite; }
 .spinner.lg { width: 18px; height: 18px; border-width: 2.5px; }
@@ -162,6 +220,29 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .chat-input button { background: var(--accent); color: var(--accent-ink); border: none; border-radius: 10px; padding: 0 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
 
+.mgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.mcard { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.mcard .mval { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 600; }
+.mcard .mval.bad { color: var(--warn); }
+.mcard .mlabel { font-size: 12px; color: var(--dim); margin-top: 3px; }
+.chart { display: flex; align-items: flex-end; gap: 4px; height: 90px; padding: 6px 2px 0; }
+.chart .bar { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; opacity: 0.85; }
+.chart .bar.zero { background: var(--chip); }
+.chart-days { display: flex; gap: 4px; margin-top: 6px; }
+.chart-days span { flex: 1; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--faint); overflow: hidden; }
+.rev-rows { display: flex; flex-direction: column; }
+.rev-row { display: flex; align-items: center; gap: 10px; padding: 10px 22px; border-top: 1px solid var(--line); font-size: 14px; }
+.rev-row .grow { flex: 1; }
+.rev-row .num { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.rev-row .num.bad { color: var(--warn); font-weight: 600; }
+.range-btns { display: flex; gap: 6px; }
+.range-btns button {
+  border: 1px solid var(--border); background: var(--card); color: var(--dim);
+  border-radius: 7px; padding: 5px 11px; font-size: 12px; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+}
+.range-btns button.active { background: var(--chip); color: var(--ink); font-weight: 600; }
+.assess { padding: 4px 22px 16px; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; }
 .hist-nav { display: flex; align-items: center; gap: 10px; }
 .hist-nav .label { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--ink); min-width: 220px; text-align: center; }
 .hist-empty { color: var(--faint); font-size: 14px; padding: 22px; }
@@ -216,6 +297,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
     <div class="view" id="view-hoje"></div>
     <div class="view" id="view-projetos"></div>
     <div class="view" id="view-chat"></div>
+    <div class="view" id="view-rev"></div>
     <div class="view" id="view-hist"></div>
   </div>
   <div id="modal-root"></div>
@@ -231,6 +313,7 @@ const S = {
   tasks: [], projects: [],
   histDay: null, histTasks: [],
   chat: [], chatThinking: false,
+  review: { days: 14, metrics: null, assessment: '', thinking: false },
   modal: null,
   plan: { stage: 'input', text: '', suggested: [] },
   cp: { stage: 'pick', projectId: null, text: '', blocks: [], name: '', goal: '' },
@@ -245,6 +328,19 @@ function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   })[c]);
+}
+// Markdown inline mínimo para texto vindo do modelo. Converte SOBRE a string já
+// escapada — as únicas tags no resultado são as geradas aqui.
+function md(s) {
+  let h = esc(s);
+  h = h.replace(/```\w*\n?([\s\S]*?)```/g, (_, c) => '<code class="blk">' + c.replace(/\n$/, '') + '</code>');
+  h = h.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  h = h.replace(/^#{1,4}\s+(.+)$/gm, '<strong>$1</strong>');
+  h = h.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+  h = h.replace(/(^|[\s(])\*([^*\s][^*\n]*?)\*(?=$|[\s).,;:!?])/gm, '$1<em>$2</em>');
+  h = h.replace(/(^|[\s(])_([^_\s][^_\n]*?)_(?=$|[\s).,;:!?])/gm, '$1<em>$2</em>');
+  return h;
 }
 function fmtLong(day) {
   const s = new Date(day + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -326,22 +422,24 @@ document.getElementById('theme-btn').onclick = () =>
 function render() {
   renderNav();
   renderServer();
-  for (const v of ['hoje', 'projetos', 'chat', 'hist']) {
+  for (const v of ['hoje', 'projetos', 'chat', 'rev', 'hist']) {
     document.getElementById('view-' + v).classList.toggle('active', S.view === v);
   }
   if (S.view === 'hoje') renderHoje();
   if (S.view === 'projetos') renderProjetos();
   if (S.view === 'chat') renderChat();
+  if (S.view === 'rev') renderRev();
   if (S.view === 'hist') renderHist();
   renderModal();
 }
 function go(view) {
   S.view = view;
   if (view === 'hist') loadHist();
+  if (view === 'rev' && !S.review.metrics) loadReview();
   render();
 }
 function renderNav() {
-  const items = [['Hoje', 'hoje'], ['Projetos', 'projetos'], ['Chat', 'chat'], ['Histórico', 'hist']];
+  const items = [['Hoje', 'hoje'], ['Projetos', 'projetos'], ['Chat', 'chat'], ['Análise', 'rev'], ['Histórico', 'hist']];
   document.getElementById('nav').innerHTML = items.map(([label, key]) =>
     '<button class="' + (S.view === key ? 'active' : '') + '" onclick="go(\'' + key + '\')">' + label + '</button>'
   ).join('');
@@ -355,13 +453,36 @@ function tagClass(tag) {
   if (tag === 'em risco' || tag === 'desviando') return 'tag risk';
   return 'tag';
 }
+function projClass(id) { return 'c' + (((id % 6) + 6) % 6); }
+function projSelectHtml(t, clickable) {
+  if (!clickable && !t.project_id) return '';
+  const options = S.projects.filter(p => p.active || p.id === t.project_id);
+  const opts = ['<option value="">projeto</option>']
+    .concat(options.map(p =>
+      '<option value="' + p.id + '"' + (p.id === t.project_id ? ' selected' : '') + '>' + esc(p.name) + '</option>'));
+  const cls = t.project_id ? projClass(t.project_id) : '';
+  return '<select class="proj-chip proj-select ' + cls + '" title="projeto"'
+    + (clickable ? ' onchange="setTaskProject(' + t.id + ', this.value)"' : ' disabled')
+    + '>' + opts.join('') + '</select>';
+}
 function taskRow(t, clickable) {
+  const late = t.due && !t.done && t.due < S.today;
+  const chips = []
+    .concat([projSelectHtml(t, clickable)])
+    .concat((t.tags || []).map(tag => '<span class="tag">' + esc(tag) + '</span>'))
+    .concat(t.effort ? ['<span class="eff" title="esforço estimado">' + esc(t.effort) + '</span>'] : [])
+    .concat(t.due
+      ? ['<span class="due' + (late ? ' late' : '') + '" title="prazo ' + esc(t.due) + '">'
+        + fmtShort(t.due) + (late ? ' !' : '') + '</span>']
+      : [])
+    .filter(Boolean);
   return '<div class="task-row' + (t.done ? ' done' : '') + '">'
     + '<span class="checkbox' + (t.done ? ' checked' : '') + (clickable ? '' : ' static') + '"'
     + (clickable ? ' onclick="toggleTask(' + t.id + ')"' : '') + '>' + (t.done ? '✓' : '') + '</span>'
     + (t.priority != null
       ? '<span class="prio' + (t.priority === 1 ? ' p1' : '') + '">P' + t.priority + '</span>' : '')
     + '<span class="task-title' + (t.done ? ' done' : '') + '">' + esc(t.title) + '</span>'
+    + (chips.length ? '<span class="task-chips">' + chips.join('') + '</span>' : '')
     + '</div>';
 }
 
@@ -379,14 +500,26 @@ function renderHoje() {
     + '<div class="card-head"><div class="card-title">To-do de hoje</div>'
     + '<div class="card-count">' + done + ' / ' + S.tasks.length + ' feitas</div></div>'
     + S.tasks.map(t => taskRow(t, true)).join('')
-    + '<div class="add-row"><input id="new-task" placeholder="Adicionar tarefa…  (Enter salva)" onkeydown="addTaskKey(event)"></div>'
-    + '</div>';
+    + '<div class="add-row">'
+    + '<input type="text" id="new-task" placeholder="Adicionar tarefa…  (Enter salva)" onkeydown="addTaskKey(event)">'
+    + '</div>'
+    + '<div class="add-opts">'
+    + '<select class="opt" id="new-project" title="projeto">'
+    + '<option value="">projeto</option>'
+    + active.map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('')
+    + '</select>'
+    + '<input type="text" class="opt" id="new-tags" placeholder="tags" title="tags separadas por vírgula" onkeydown="addTaskKey(event)">'
+    + '<input type="date" class="opt" id="new-due" title="prazo">'
+    + '<select class="opt" id="new-eff" title="esforço estimado">'
+    + '<option value="">esf</option><option>P</option><option>M</option><option>G</option></select>'
+    + '</div></div>';
   html += '<div class="grid2">'
     + '<div class="card card-pad"><div class="mini-head"><div class="mini-title">Projetos</div>'
     + '<button class="btn-link" onclick="go(\'projetos\')">ver todos</button></div>'
     + '<div class="chip-col">'
     + (active.length
-      ? active.map(p => '<div class="chip-row"><span>' + esc(p.name) + '</span>'
+      ? active.map(p => '<div class="chip-row"><span style="display:flex; align-items:center; gap:8px;">'
+        + '<span class="proj-dot ' + projClass(p.id) + '"></span>' + esc(p.name) + '</span>'
         + '<span class="' + tagClass(p.tag) + '">' + esc(p.tag) + '</span></div>').join('')
       : '<div class="hist-empty" style="padding:0; font-size:13px;">Nenhum projeto ativo.</div>')
     + '</div></div>'
@@ -410,14 +543,23 @@ function renderProjetos() {
     html += '<div class="np-form">'
       + '<input id="np-name" placeholder="Nome curto do projeto" value="' + esc(S.np.name) + '">'
       + '<input id="np-goal" placeholder="Objetivo da entrega (o que é \'pronto\')" value="' + esc(S.np.goal) + '">'
+      + '<input id="np-deadline" type="date" title="data-alvo da entrega (opcional)">'
       + '<div class="np-actions"><button class="btn-plain" onclick="toggleNp()">Cancelar</button>'
       + '<button class="btn-primary" style="padding:9px 16px; font-size:13px;" onclick="saveNp()">Criar projeto</button></div></div>';
   }
   for (const p of S.projects) {
     const tl = p.timeline;
+    const projLate = p.deadline && p.active && p.deadline < S.today;
     html += '<div class="proj-card' + (p.active ? '' : ' done') + '">'
-      + '<div class="proj-head"><span class="proj-name">' + esc(p.name) + '</span>'
-      + '<span class="' + tagClass(p.tag) + '" style="padding:3px 8px;">' + esc(p.tag) + '</span></div>'
+      + '<div class="proj-head"><span class="proj-name" style="display:flex; align-items:center; gap:9px;">'
+      + '<span class="proj-dot ' + projClass(p.id) + '"></span>' + esc(p.name) + '</span>'
+      + '<span style="display:flex; gap:6px; align-items:center;">'
+      + (p.tasks.total
+        ? '<span class="due" title="tarefas do projeto">' + p.tasks.done + '/' + p.tasks.total + ' tarefas</span>' : '')
+      + (p.deadline
+        ? '<span class="due' + (projLate ? ' late' : '') + '" title="prazo da entrega">'
+          + fmtShort(p.deadline) + (projLate ? ' !' : '') + '</span>' : '')
+      + '<span class="' + tagClass(p.tag) + '" style="padding:3px 8px;">' + esc(p.tag) + '</span></span></div>'
       + '<div class="proj-goal">' + esc(p.goal) + '</div>';
     if (tl.length) {
       html += '<div class="timeline">' + tl.map((c, i) => {
@@ -451,7 +593,9 @@ function renderChat() {
     html += '<div class="chat-empty">Pergunte sobre priorização, quebra de tarefas ou qualidade das entregas. O modelo enxerga suas tarefas e projetos.</div>';
   }
   html += S.chat.map(m =>
-    '<div class="bubble ' + (m.role === 'user' ? 'user' : 'bot') + '">' + esc(m.content) + '</div>'
+    m.role === 'user'
+      ? '<div class="bubble user">' + esc(m.content) + '</div>'
+      : '<div class="bubble bot">' + md(m.content) + '</div>'
   ).join('');
   if (S.chatThinking) {
     html += '<div class="thinking"><span class="spinner"></span>Pensando…</div>';
@@ -464,6 +608,81 @@ function renderChat() {
   document.getElementById('view-chat').innerHTML = html;
   const el = document.getElementById('view-chat');
   el.scrollTop = el.scrollHeight;
+}
+
+function pct(p) { return p == null ? '—' : Math.round(p * 100) + '%'; }
+function days_(v) { return v == null ? '—' : v + ' d'; }
+function renderRev() {
+  const m = S.review.metrics;
+  let html = '<div class="stack-md">';
+  html += '<div style="display:flex; justify-content:space-between; align-items:flex-end;">'
+    + '<div><div class="kicker">execução dos últimos ' + S.review.days + ' dias</div>'
+    + '<div class="h2">Análise</div></div>'
+    + '<div class="range-btns">' + [7, 14, 30].map(n =>
+      '<button class="' + (S.review.days === n ? 'active' : '') + '" onclick="setRevDays(' + n + ')">' + n + 'd</button>'
+    ).join('') + '</div></div>';
+  if (!m) {
+    html += '<div class="wait"><span class="spinner lg"></span><span>Calculando métricas…</span></div></div>';
+    document.getElementById('view-rev').innerHTML = html;
+    return;
+  }
+  const late = m.overdue.length;
+  html += '<div class="mgrid">'
+    + '<div class="mcard"><div class="mval">' + m.done + ' / ' + m.total + '</div><div class="mlabel">concluídas no período</div></div>'
+    + '<div class="mcard"><div class="mval' + (late ? ' bad' : '') + '">' + late + '</div><div class="mlabel">atrasadas agora</div></div>'
+    + '<div class="mcard"><div class="mval">' + pct(m.on_time_rate) + '</div><div class="mlabel">entrega no prazo</div></div>'
+    + '<div class="mcard"><div class="mval">' + pct(m.unplanned_rate) + '</div><div class="mlabel">não planejado</div></div>'
+    + '<div class="mcard"><div class="mval">' + pct(m.carryover_rate) + '</div><div class="mlabel">viraram o dia</div></div>'
+    + '<div class="mcard"><div class="mval">' + days_(m.avg_lead_days) + '</div><div class="mlabel">lead time médio</div></div>'
+    + '<div class="mcard"><div class="mval">' + m.throughput_per_week + '</div><div class="mlabel">concluídas/semana</div></div>'
+    + '</div>';
+  const max = Math.max(1, ...m.done_per_day.map(d => d.done));
+  html += '<div class="card card-pad"><div class="mini-title" style="margin-bottom:4px;">Concluídas por dia</div>'
+    + '<div class="chart">' + m.done_per_day.map(d =>
+      '<div class="bar' + (d.done ? '' : ' zero') + '" style="height:' + Math.max(2, d.done / max * 100) + '%"'
+      + ' title="' + esc(d.day) + ': ' + d.done + '"></div>').join('') + '</div>'
+    + '<div class="chart-days">' + m.done_per_day.map(d => '<span>' + d.day.slice(8) + '</span>').join('') + '</div>'
+    + '</div>';
+  if (late) {
+    html += '<div class="card card-list"><div class="card-head"><div class="card-title">Tarefas atrasadas</div></div>'
+      + '<div class="rev-rows">' + m.overdue.map(t =>
+        '<div class="rev-row"><span class="grow">' + esc(t.title) + '</span>'
+        + '<span class="num bad">' + esc(t.due) + '</span></div>').join('') + '</div></div>';
+  }
+  if (Object.keys(m.by_effort).length) {
+    html += '<div class="card card-list"><div class="card-head"><div class="card-title">Por esforço estimado</div>'
+      + '<div class="card-count">tarefas · concluídas · lead médio</div></div>'
+      + '<div class="rev-rows">' + Object.entries(m.by_effort).map(([level, s]) =>
+        '<div class="rev-row"><span class="eff">' + level + '</span><span class="grow"></span>'
+        + '<span class="num">' + s.total + ' · ' + s.done + ' · ' + days_(s.avg_lead_days) + '</span></div>').join('')
+      + '</div></div>';
+  }
+  if (Object.keys(m.by_tag).length) {
+    html += '<div class="card card-list"><div class="card-head"><div class="card-title">Por tag</div>'
+      + '<div class="card-count">tarefas · concluídas · atrasadas · lead médio</div></div>'
+      + '<div class="rev-rows">' + Object.entries(m.by_tag).map(([tag, s]) =>
+        '<div class="rev-row"><span class="tag">' + esc(tag) + '</span><span class="grow"></span>'
+        + '<span class="num' + (s.overdue ? ' bad' : '') + '">' + s.total + ' · ' + s.done + ' · ' + s.overdue + ' · ' + days_(s.avg_lead_days) + '</span></div>').join('')
+      + '</div></div>';
+  }
+  if (Object.keys(m.by_project).length) {
+    html += '<div class="card card-list"><div class="card-head"><div class="card-title">Por projeto</div>'
+      + '<div class="card-count">tarefas · concluídas · atrasadas · lead médio</div></div>'
+      + '<div class="rev-rows">' + Object.entries(m.by_project).map(([pid, s]) =>
+        '<div class="rev-row"><span class="proj-chip ' + projClass(Number(pid)) + '">' + esc(s.name) + '</span><span class="grow"></span>'
+        + '<span class="num' + (s.overdue ? ' bad' : '') + '">' + s.total + ' · ' + s.done + ' · ' + s.overdue + ' · ' + days_(s.avg_lead_days) + '</span></div>').join('')
+      + '</div></div>';
+  }
+  html += '<div class="card card-list"><div class="card-head"><div class="card-title">Avaliação do modelo</div>'
+    + (S.review.thinking
+      ? '<span class="spinner"></span>'
+      : '<button class="btn-link" onclick="runAssess()">' + (S.review.assessment ? 'reavaliar' : 'avaliar período') + '</button>')
+    + '</div>'
+    + (S.review.assessment ? '<div class="assess">' + md(S.review.assessment) + '</div>'
+      : '<div class="hist-empty" style="padding:4px 22px 16px;">O modelo aponta onde a execução está pecando e o que ajustar.</div>')
+    + '</div>';
+  html += '</div>';
+  document.getElementById('view-rev').innerHTML = html;
 }
 
 function renderHist() {
@@ -488,17 +707,32 @@ function renderHist() {
 async function toggleTask(id) {
   try {
     await api('/api/tasks/' + id + '/toggle', {});
+    S.review.metrics = null;
+    await loadState();
+    if (S.view === 'hist') await loadHist();
+  } catch (e) { toast(e.message); }
+}
+async function setTaskProject(id, value) {
+  const project_id = value ? Number(value) : null;
+  try {
+    await api('/api/tasks/' + id + '/project', { project_id });
+    S.review.metrics = null;
     await loadState();
     if (S.view === 'hist') await loadHist();
   } catch (e) { toast(e.message); }
 }
 async function addTaskKey(ev) {
   if (ev.key !== 'Enter') return;
-  const input = document.getElementById('new-task');
-  const title = input.value.trim();
+  const title = document.getElementById('new-task').value.trim();
   if (!title) return;
+  const tags = document.getElementById('new-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+  const due = document.getElementById('new-due').value || null;
+  const effort = document.getElementById('new-eff').value || null;
+  const projectVal = document.getElementById('new-project').value;
+  const project_id = projectVal ? Number(projectVal) : null;
   try {
-    await api('/api/tasks', { title });
+    await api('/api/tasks', { title, tags, due_date: due, effort, project_id });
+    S.review.metrics = null;
     await loadState();
     document.getElementById('new-task').focus();
   } catch (e) { toast(e.message); }
@@ -513,9 +747,10 @@ function toggleNp() {
 async function saveNp() {
   const name = document.getElementById('np-name').value.trim();
   const goal = document.getElementById('np-goal').value.trim();
+  const deadline = document.getElementById('np-deadline').value || null;
   if (!name || !goal) { toast('Preencha nome e objetivo do projeto.'); return; }
   try {
-    await api('/api/projects', { name, goal });
+    await api('/api/projects', { name, goal, deadline });
     S.np = { open: false, name: '', goal: '' };
     await loadState();
   } catch (e) { toast(e.message); }
@@ -650,9 +885,16 @@ function renderModal() {
     } else {
       inner = '<div class="modal-title">Sugestão de to-do</div>'
         + '<div class="modal-sub" style="font-size:13.5px;">Gerada pelo modelo a partir do seu relato e dos projetos ativos.</div>'
-        + '<div class="suggest-list">' + S.plan.suggested.map(s =>
-          '<div class="suggest-item"><span class="num">' + s.priority + '.</span>'
-          + '<span class="txt">' + esc(s.title) + '</span></div>').join('') + '</div>'
+        + '<div class="suggest-list">' + S.plan.suggested.map(s => {
+          const chips = []
+            .concat((s.tags || []).map(tag => '<span class="tag">' + esc(tag) + '</span>'))
+            .concat(s.effort ? ['<span class="eff">' + esc(s.effort) + '</span>'] : [])
+            .concat(s.due_date ? ['<span class="due">' + fmtShort(s.due_date) + '</span>'] : []);
+          return '<div class="suggest-item"><span class="num">' + s.priority + '.</span>'
+            + '<span class="txt" style="flex:1;">' + esc(s.title) + '</span>'
+            + (chips.length ? '<span class="task-chips">' + chips.join('') + '</span>' : '')
+            + '</div>';
+        }).join('') + '</div>'
         + '<div class="modal-actions" style="margin-top:18px;"><button class="btn-plain" onclick="closeModal()">Descartar</button>'
         + '<button class="btn-primary" onclick="savePlan()">Salvar no to-do de hoje</button></div>';
     }
@@ -718,6 +960,31 @@ async function sendChat() {
   render();
   const el = document.getElementById('chat-text');
   if (el) el.focus();
+}
+
+// --- Ações: análise --------------------------------------------------------
+async function loadReview() {
+  try {
+    S.review.metrics = await api('/api/review?days=' + S.review.days);
+    render();
+  } catch (e) { toast(e.message); }
+}
+function setRevDays(n) {
+  S.review = { days: n, metrics: null, assessment: '', thinking: false };
+  render();
+  loadReview();
+}
+async function runAssess() {
+  if (!guardLLM()) return;
+  S.review.thinking = true;
+  render();
+  try {
+    const r = await api('/api/review', { days: S.review.days });
+    S.review.metrics = r.metrics;
+    S.review.assessment = r.assessment;
+  } catch (e) { toast(e.message); }
+  S.review.thinking = false;
+  render();
 }
 
 // --- Ações: histórico ------------------------------------------------------
