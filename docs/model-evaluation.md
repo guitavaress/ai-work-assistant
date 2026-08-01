@@ -1,10 +1,12 @@
 # Avaliação de modelos locais (julho/2026)
 
-Escolha do modelo padrão do assistente. Hardware alvo: **RTX 3050 Laptop 4GB VRAM**, i7 13ª gen, 32GB RAM, WSL2 Ubuntu + Docker.
+Escolha do modelo padrão do assistente. Hardware alvo: **RTX 3050 Laptop 6GB VRAM**, i7 13ª gen, 32GB RAM, WSL2 Ubuntu + Docker.
+
+> Correção (2026-08-01): a VRAM da 3050 de trabalho é **6GB**, não 4GB como assumido antes. Isso viabilizou rodar o Qwen3.5 9B **inteiro na GPU** (full offload) no modo qualidade — ver seção de decisão e benchmarks. As seções abaixo mantêm entre parênteses os números da era 4GB quando úteis de referência.
 
 ## Critérios
 
-1. **Caber em 4GB de VRAM** em quantização Q4, com espaço para o KV cache — inferência 100% na GPU é o que garante velocidade interativa.
+1. **Caber em 6GB de VRAM** em quantização Q4, com espaço para o KV cache — inferência 100% na GPU é o que garante velocidade interativa.
 2. **Português do Brasil fluente** — todos os prompts e interações são em PT-BR.
 3. **Tool calling / saída estruturada confiável** — o `wa plan` depende de JSON válido (mitigado pela gramática GBNF do llama.cpp, mas o modelo precisa preencher o schema com conteúdo bom).
 4. **Licença permissiva** — o projeto é público.
@@ -17,27 +19,27 @@ Escolha do modelo padrão do assistente. Hardware alvo: **RTX 3050 Laptop 4GB VR
 | Gemma 3 4B / Gemma 4 small | ~2.7 GB | similar | Muito bom | Mais fraco em raciocínio multi-etapas e tool calling | Gemma (restrições) | Alternativa |
 | Phi-4-mini 3.8B | ~2.5 GB | similar | Fraco | Ótimo em inglês | MIT | ❌ PT-BR insuficiente |
 | Llama 3.2 3B | ~2.0 GB | folga | OK | Geração anterior, abaixo do Qwen3.5 4B em tudo | Llama license | ❌ Superado |
-| Qwen3.5 9B Instruct | 5.68 GB | não cabe → offload parcial (`-ngl 24`) | Excelente | Forte | Apache 2.0 | ⚙️ **Modo qualidade** opcional |
+| Qwen3.5 9B Instruct | 5.17 GB (IQ4_XS) | full offload em 6GB (~5.8GB c/ KV q8_0) | Excelente | Forte; thinking | Apache 2.0 | ⚙️ **Modo qualidade** opcional |
 
 ## Decisão
 
 **Padrão: `unsloth/Qwen3.5-4B-GGUF` → `Qwen3.5-4B-Q4_K_M.gguf`.**
-Na RTX 3050 4GB roda inteiro na GPU com KV cache q8_0 e contexto de 8K (~3.3GB de VRAM), com expectativa de 25–40 tokens/s — velocidade confortável para `wa plan` e `wa chat`.
+Na RTX 3050 roda inteiro na GPU com KV cache q8_0 e contexto de 8K (~3.2GB de VRAM), com expectativa de 25–40 tokens/s — velocidade confortável para `wa plan` e `wa chat`.
 
-**Modo qualidade: `unsloth/Qwen3.5-9B-GGUF` → `Qwen3.5-9B-Q4_K_M.gguf`.**
-Com 32GB de RAM, roda com offload parcial (18 camadas na GPU, resto na CPU — ver benchmarks abaixo). Lento demais para chat, mas adequado para o `wa standup`, que é geração única e curta. Ativado via profile `quality` do docker-compose + `WA_QUALITY_MODEL=qwen3.5-9b`.
+**Modo qualidade: `unsloth/Qwen3.5-9B-GGUF` → `Qwen3.5-9B-IQ4_XS.gguf`.**
+Com 6GB, o 9B roda **inteiro na GPU** (`-ngl 99`) no quant IQ4_XS (~5.17GB de peso; ~5.8GB c/ KV q8_0 e c=8192) — full offload é o que dá velocidade, ao contrário do offload parcial da era 4GB. Usado pelo `wa review` com thinking ligado (`WA_QUALITY_ENABLE_THINKING`, teto `WA_QUALITY_MAX_TOKENS=4096`). Ativado via profile `quality` do docker-compose + `WA_QUALITY_MODEL=qwen3.5-9b`. O 4B (padrão) e o 9B (qualidade) não cabem residentes juntos nos 6GB — um profile por vez.
 
-## Flags do llama.cpp (RTX 3050 4GB)
+## Flags do llama.cpp (RTX 3050 6GB)
 
 | Flag | Efeito |
 |---|---|
 | `-ngl 99` | Todas as camadas na GPU (o 4B cabe) |
 | `--flash-attn on` | Menos VRAM/mais rápido; pré-requisito do cache V quantizado |
 | `--cache-type-k q8_0 --cache-type-v q8_0` | KV cache pela metade, perda desprezível |
-| `-c 8192` | Contexto suficiente p/ os prompts do assistente sem estourar 4GB |
+| `-c 8192` | Contexto suficiente p/ os prompts do assistente sem estourar a VRAM |
 | `--jinja` | Chat template nativo do Qwen (tool calling/JSON) |
 
-Validação na máquina alvo: `nvidia-smi` (processo < ~3.5GB) e `llama-bench` para tokens/s.
+Validação na máquina alvo: `nvidia-smi` (4B < ~3.5GB; 9B em qualidade ~5.8GB, perto do teto dos 6GB) e `llama-bench` para tokens/s.
 
 ## Benchmarks medidos (2026-07-16, RTX 4070 12GB)
 
@@ -57,22 +59,35 @@ Matriz de configs medida com a imagem `server-cuda` oficial, prompt de ~700 toke
 Conclusões:
 - **flash-attn é obrigatório**: sem ele o prompt processing cai pela metade e a VRAM sobe 400 MiB.
 - O KV quantizado economiza pouco neste modelo (GQA agressivo), mas custa quase nada — mantido q8_0 pela margem de segurança na 3050.
-- Todas as variantes com flash-attn cabem nos 4096 MiB da 3050. **Estimativa na 3050: ~40–45 t/s de geração, ~1200 t/s de prompt** — confortável para uso interativo.
+- Todas as variantes com flash-attn cabem folgado nos 6144 MiB da 3050. **Estimativa na 3050: ~40–45 t/s de geração, ~1200 t/s de prompt** — confortável para uso interativo.
 
-### Qwen3.5 9B (Q4_K_M, offload parcial, flash-attn + KV q8_0, c=8192)
+### Qwen3.5 9B — alvo em 6GB: full offload (IQ4_XS)
 
-| `-ngl` | VRAM | Prompt (t/s) | Geração (t/s) | Cabe na 3050 (4096 MiB)? |
+Com 6GB o objetivo muda de "maximizar camadas na GPU" (era 4GB) para **rodar o modelo inteiro na GPU** com um quant um pouco menor — full offload é o que dá o salto de velocidade. O escolhido é **IQ4_XS** (`-ngl 99`, flash-attn + KV q8_0, c=8192):
+
+- Peso IQ4_XS ≈ 5.17 GB; overhead de KV q8_0 (c=8192) + compute ≈ 550 MiB (extrapolado do benchmark parcial abaixo) → **~5.8 GB de VRAM**, dentro dos 6144 MiB com margem apertada (~300 MiB). **Medir com `nvidia-smi` na máquina alvo** (linha a preencher após o benchmark):
+
+| Quant / config | VRAM (medir) | Prompt (t/s) | Geração (t/s) | Cabe nos 6144 MiB? |
 |---|---|---|---|---|
-| 28 | 4517 MiB | 1164 | 26.2 | ❌ |
-| 24 | 4280 MiB | 994 | 16.9 | ❌ |
-| 20 | 3770 MiB | 831 | 13.3 | ⚠️ margem de ~330 MiB |
-| **18 (adotada)** | **3490 MiB** | 730 | 11.0 | ✅ margem de ~600 MiB |
-| 16 | 2812 MiB | 626 | 10.5 | ✅ folga grande |
+| **IQ4_XS, `-ngl 99`, KV q8_0, c=8192 (alvo)** | ~5.8 GB (a medir) | a medir | a medir | ⚠️ margem ~300 MiB |
+| Q4_K_S, `-ngl 99` (fallback maior) | ~6.0 GB (a medir) | a medir | a medir | ❌ provavelmente não |
+| Q3_K_M, `-ngl 99` (fallback menor, se IQ4_XS não couber) | ~5.0 GB (a medir) | a medir | a medir | ✅ folga |
 
-Conclusões:
-- O valor original (`-ngl 24`) **estourava a VRAM da 3050** — corrigido para 18.
-- Na 3050 a parte GPU será mais lenta e a geração depende também da CPU (i7 13ª gen): estimativa **~6–9 t/s**. OK para o `wa standup`; inviável para chat.
-- Se na máquina alvo o `nvidia-smi` mostrar folga (> 600 MiB livres), vale testar `-ngl 20`.
+Se o IQ4_XS full offload não couber com folga, os caminhos são: (a) reduzir para `c=4096` e/ou KV `q4_0`; (b) descer para um quant Q3 (full offload garantido, leve perda de qualidade). Q4_K_M com offload parcial vira o último recurso ("máxima fidelidade, mais lento").
+
+#### Referência histórica (era 4GB): 9B Q4_K_M com offload parcial
+
+Dados medidos quando o alvo era 4GB — mantidos como referência da relação `-ngl` × VRAM × velocidade (flash-attn + KV q8_0, c=8192):
+
+| `-ngl` | VRAM | Prompt (t/s) | Geração (t/s) |
+|---|---|---|---|
+| 28 | 4517 MiB | 1164 | 26.2 |
+| 24 | 4280 MiB | 994 | 16.9 |
+| 20 | 3770 MiB | 831 | 13.3 |
+| 18 | 3490 MiB | 730 | 11.0 |
+| 16 | 2812 MiB | 626 | 10.5 |
+
+Nota: a geração no offload parcial dependia da CPU (i7 13ª gen), daí ~11 t/s a `-ngl 18`. O full offload em 6GB elimina esse gargalo — espera-se geração bem acima disso (a medir), tornando o `wa review` com thinking viável.
 
 ## Fontes
 

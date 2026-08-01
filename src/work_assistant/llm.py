@@ -32,12 +32,15 @@ def complete(
     """Chat simples: retorna o texto da resposta.
 
     Com quality=True e WA_QUALITY_MODEL definido, usa o servidor do modelo
-    de qualidade (porta 8081 no docker-compose) em vez do padrão.
+    de qualidade (porta 8081 no docker-compose) em vez do padrão, com thinking
+    ligado (WA_QUALITY_ENABLE_THINKING) e teto de tokens maior (QUALITY_MAX_TOKENS).
     """
     if quality and config.QUALITY_MODEL:
         api, model = client(config.QUALITY_BASE_URL), config.QUALITY_MODEL
+        thinking, max_tokens = config.QUALITY_ENABLE_THINKING, config.QUALITY_MAX_TOKENS
     else:
         api, model = client(), config.LLM_MODEL
+        thinking, max_tokens = config.ENABLE_THINKING, config.MAX_TOKENS
     messages = [{"role": "system", "content": system}]
     messages.extend(history or [])
     messages.append({"role": "user", "content": user})
@@ -45,8 +48,8 @@ def complete(
         model=model,
         messages=messages,
         temperature=0.7,
-        max_tokens=config.MAX_TOKENS,
-        extra_body={"chat_template_kwargs": {"enable_thinking": config.ENABLE_THINKING}},
+        max_tokens=max_tokens,
+        extra_body={"chat_template_kwargs": {"enable_thinking": thinking}},
     )
     return response.choices[0].message.content or ""
 
