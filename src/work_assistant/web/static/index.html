@@ -501,9 +501,8 @@ function renderHoje() {
       : '<div class="empty" style="padding:0; font-size:13px;">Nenhum projeto ativo.</div>')
     + '</div>';
   html += '<div class="scard"><div class="scard-title">Ritual do dia</div>'
-    + '<div class="scard-sub">Standup da daily, checkpoint de projeto e análise da execução.</div>'
+    + '<div class="scard-sub">Checkpoint de projeto e análise da execução.</div>'
     + '<div class="quick">'
-    + '<button class="btn" onclick="openStandup()">Standup</button>'
     + '<button class="btn" onclick="openCheckpoint()">Checkpoint</button>'
     + '<button class="btn" onclick="go(\'rev\')">Análise</button>'
     + '</div></div>';
@@ -877,29 +876,6 @@ async function runCp() {
   }
 }
 
-// --- Modal: standup --------------------------------------------------------
-function openStandup() {
-  if (!guardLLM()) return;
-  S.modal = 'standup';
-  S.su = { stage: 'thinking', blocks: [], copied: false };
-  render();
-  api('/api/standup', { days: 1 }).then(r => {
-    S.su.blocks = r.blocks;
-    S.su.stage = 'ready';
-    render();
-  }).catch(e => {
-    S.modal = null;
-    render();
-    toast(e.message);
-  });
-}
-function copyStandup() {
-  const txt = S.su.blocks.map(b => b.title + ': ' + b.body).join('\n');
-  try { navigator.clipboard.writeText(txt); } catch (e) {}
-  S.su.copied = true;
-  render();
-}
-
 function renderModal() {
   const root = document.getElementById('modal-root');
   if (!S.modal) { root.innerHTML = ''; return; }
@@ -970,19 +946,6 @@ function renderModal() {
           '<div><div class="block-title">' + esc(b.title) + '</div>'
           + '<div class="block-body">' + esc(b.body) + '</div></div>').join('') + '</div>'
         + '<div class="modal-foot"><span class="saved-note">checkpoint salvo</span>'
-        + '<button class="btn-primary" onclick="closeModal()">Fechar</button></div>';
-    }
-  } else if (S.modal === 'standup') {
-    if (S.su.stage === 'thinking') {
-      inner = '<div class="wait"><span class="spinner lg"></span><span>Preparando o standup…</span></div>';
-    } else {
-      inner = '<div class="modal-title">Fala da daily</div>'
-        + '<div class="modal-sub" style="font-size:13.5px;">Gerada a partir do histórico de ontem e de hoje. Leia em voz alta ou copie.</div>'
-        + '<div class="blocks">' + S.su.blocks.map(b =>
-          '<div><div class="block-title">' + esc(b.title) + '</div>'
-          + '<div class="block-body">' + esc(b.body) + '</div></div>').join('') + '</div>'
-        + '<div class="modal-actions" style="margin-top:20px;">'
-        + '<button class="btn" style="padding:10px 16px; font-size:14px;" onclick="copyStandup()">' + (S.su.copied ? 'Copiado ✓' : 'Copiar') + '</button>'
         + '<button class="btn-primary" onclick="closeModal()">Fechar</button></div>';
     }
   }

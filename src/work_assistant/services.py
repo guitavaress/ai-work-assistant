@@ -50,18 +50,6 @@ CHECKPOINT_SCHEMA = {
     "additionalProperties": False,
 }
 
-STANDUP_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "ontem": {"type": "string"},
-        "hoje": {"type": "string"},
-        "impedimentos": {"type": "string"},
-    },
-    "required": ["ontem", "hoje", "impedimentos"],
-    "additionalProperties": False,
-}
-
-
 # --- Plan -------------------------------------------------------------------
 
 
@@ -143,47 +131,6 @@ def run_checkpoint(conn: sqlite3.Connection, project: db.Project, progress: str)
         "markdown": markdown,
         "status": result["status"],
         "summary": result["resumo"],
-    }
-
-
-# --- Standup ----------------------------------------------------------------
-
-
-def run_standup(conn: sqlite3.Connection, days: int = 1) -> dict:
-    """Gera a fala da daily em blocos (Ontem/Hoje/Impedimentos).
-
-    Levanta LookupError se não houver histórico no período.
-    """
-    start = (date.today() - timedelta(days=days)).isoformat()
-    past_tasks = db.list_tasks_between(conn, start, date.today().isoformat())
-    if not past_tasks:
-        raise LookupError("Sem histórico no período — nada para resumir.")
-
-    lines = []
-    for t in past_tasks:
-        status = "feita" if t.status == "done" else "pendente"
-        lines.append(f"- {t.day} [{status}] {t.title}")
-
-    user_message = (
-        f"Hoje é {db.today()}.\n\n"
-        f"Histórico de tarefas ({start} a hoje):\n" + "\n".join(lines) + "\n\n"
-        f"Projetos ativos:\n{context.projects_block(conn)}\n\n"
-        f"Última avaliação de checkpoint por projeto:\n{context.latest_assessments_block(conn)}"
-    )
-    result = llm.structured(
-        llm.load_prompt("standup"), user_message, STANDUP_SCHEMA, quality=True
-    )
-    return {
-        "blocks": [
-            {"title": "Ontem", "body": result["ontem"]},
-            {"title": "Hoje", "body": result["hoje"]},
-            {"title": "Impedimentos", "body": result["impedimentos"]},
-        ],
-        "markdown": (
-            f"**Ontem**: {result['ontem']}\n\n"
-            f"**Hoje**: {result['hoje']}\n\n"
-            f"**Impedimentos**: {result['impedimentos']}"
-        ),
     }
 
 

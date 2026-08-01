@@ -47,10 +47,6 @@ class CheckpointIn(BaseModel):
     progress: str
 
 
-class StandupIn(BaseModel):
-    days: int = 1
-
-
 class ReviewIn(BaseModel):
     days: int = 14
 
@@ -261,15 +257,6 @@ def checkpoint(body: CheckpointIn):
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return _llm_call(services.run_checkpoint, conn, project, body.progress)
-
-
-@app.post("/api/standup")
-def standup(body: StandupIn):
-    conn = db.connect()
-    try:
-        return _llm_call(services.run_standup, conn, body.days)
-    except LookupError as e:
-        raise HTTPException(status_code=409, detail=str(e))
 
 
 @app.get("/api/review")

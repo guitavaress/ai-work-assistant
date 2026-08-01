@@ -278,21 +278,6 @@ def test_checkpoint_missing_project_404(client):
     assert resp.status_code == 404
 
 
-def test_standup_returns_blocks(client, conn, monkeypatch):
-    db.add_task(conn, "Feita ontem", day=db.today())
-    monkeypatch.setattr(
-        llm,
-        "structured",
-        lambda *a, **k: {"ontem": "Fechei X.", "hoje": "Vou fazer Y.", "impedimentos": "Sem impedimentos"},
-    )
-    body = client.post("/api/standup", json={"days": 1}).json()
-    assert [b["title"] for b in body["blocks"]] == ["Ontem", "Hoje", "Impedimentos"]
-
-
-def test_standup_without_history_409(client):
-    assert client.post("/api/standup", json={"days": 1}).status_code == 409
-
-
 def test_chat_uses_history(client, monkeypatch):
     captured = {}
 
