@@ -897,6 +897,34 @@ function assessBlocks(text) {
   }
   return parts.length ? parts : [{ title: '', body: text.trim() }];
 }
+function splitBlock(rc) {
+  if (!rc || !rc.attributed) {
+    return '<div class="scard"><div class="rtable-title">Onde seu tempo foi</div>'
+      + '<div class="split-note">Nenhuma tarefa vinculada a projeto ou ciclo no período —'
+      + ' sem isso não dá para separar operação de entrega.</div></div>';
+  }
+  const run = Math.round(rc.run_share * 100), change = 100 - run;
+  const ciclos = rc.cycles_closed
+    ? ' · ' + rc.cycles_on_sla + '/' + rc.cycles_closed + ' ciclos no SLA'
+      + (rc.cycles_unknown ? ' (' + rc.cycles_unknown + ' sem data)' : '')
+    : '';
+  return '<div class="scard">'
+    + '<div class="rtable-title">Onde seu tempo foi</div>'
+    + '<div style="display:flex; align-items:baseline; gap:14px; margin-top:10px; flex-wrap:wrap;">'
+    + '<span class="split-head">' + run + '%</span>'
+    + '<span style="font-size:17px;">do período foi rotina — ' + change + '% foi projeto</span></div>'
+    + '<div class="split"><div class="split-run" style="width:' + run + '%"></div>'
+    + '<div class="split-change" style="width:' + change + '%"></div></div>'
+    + '<div class="split-legend">'
+    + '<span class="run">⟳ rotina · ' + rc.run.total + ' tarefas' + ciclos + '</span>'
+    + '<span class="change">■ projeto · ' + rc.change.total + ' tarefas · '
+    + rc.stages_done + ' etapas fechadas</span></div>'
+    + (rc.loose.total
+      ? '<div class="split-note">' + rc.loose.total + ' tarefa(s) sem projeto nem ciclo ficaram fora do cálculo.</div>'
+      : '')
+    + '</div>';
+}
+
 function renderRev() {
   const m = S.review.metrics;
   let html = '<div class="stackv">';
@@ -921,18 +949,27 @@ function renderRev() {
     [days_(m.avg_lead_days), 'lead time médio', false],
     [String(m.throughput_per_week), 'concluídas/semana', false],
   ];
+  html += splitBlock(m.run_change);
   html += '<div class="mgrid">' + cards.map(([v, l, bad]) =>
     '<div class="mcard"><div class="mval' + (bad ? ' bad' : '') + '">' + v + '</div><div class="mlabel">' + l + '</div></div>'
   ).join('') + '</div>';
 
-  const max = Math.max(1, ...m.done_per_day.map(d => d.done));
+  const max = Math.max(1, ...m.per_day.map(d => d.done));
   html += '<div class="scard"><div class="rtable-title">Tarefas concluídas por dia</div>'
-    + '<div class="spark">' + m.done_per_day.map(d => {
+    + '<div class="spark">' + m.per_day.map(d => {
       const h = d.done ? Math.max(4, Math.round(d.done / max * 80)) : 3;
-      return '<div class="spark-col" title="' + esc(d.day) + ': ' + d.done + '">'
-        + '<div class="spark-bar" style="height:' + h + 'px; background:' + (d.done ? 'var(--accent)' : 'var(--chip)') + ';"></div>'
+      // Empilha por natureza: a altura total continua sendo `done`.
+      const seg = (n, cor) => n ? '<div style="height:' + Math.round(h * n / d.done) + 'px; background:' + cor + ';"></div>' : '';
+      const dica = d.day + ': ' + d.done + ' (rotina ' + d.run + ', projeto ' + d.change + ', sem vínculo ' + d.loose + ')';
+      return '<div class="spark-col" title="' + esc(dica) + '">'
+        + (d.done
+          ? '<div class="spark-bar" style="height:' + h + 'px; background:transparent; display:flex; flex-direction:column-reverse;">'
+            + seg(d.run, 'var(--cycle)') + seg(d.change, 'var(--accent)') + seg(d.loose, 'var(--chip)') + '</div>'
+          : '<div class="spark-bar" style="height:3px; background:var(--chip);"></div>')
         + '<span class="spark-tick">' + d.day.slice(8) + '</span></div>';
-    }).join('') + '</div></div>';
+    }).join('') + '</div>'
+    + '<div class="split-legend" style="margin-top:10px;"><span class="run">■ rotina</span>'
+    + '<span class="change">■ projeto</span><span style="color:var(--faint);">■ sem vínculo</span></div></div>';
 
   // Por esforço + por tag lado a lado
   html += '<div class="tables">';
@@ -965,7 +1002,8 @@ function renderRev() {
       + '<span style="width:56px; text-align:right;">Concl.</span><span style="width:64px; text-align:right;">Atras.</span>'
       + '<span style="width:80px; text-align:right;">Lead méd.</span></div>'
       + Object.entries(m.by_project).map(([pid, s]) =>
-        '<div class="rt-row"><span style="flex:1;"><span class="proj-chip ' + projClass(Number(pid)) + '">' + esc(s.name) + '</span></span>'
+        '<div class="rt-row"><span style="flex:1;"><span class="proj-chip ' + projClass(Number(pid)) + '">'
+        + (s.kind === 'routine_run' ? '⟳ ' : '') + esc(s.name) + '</span></span>'
         + '<span style="width:56px; text-align:right; color:var(--dim);">' + s.total + '</span>'
         + '<span style="width:56px; text-align:right; color:var(--dim);">' + s.done + '</span>'
         + '<span style="width:64px; text-align:right;' + (s.overdue ? ' color:var(--warn);' : '') + '" class="mono">' + s.overdue + '</span>'
