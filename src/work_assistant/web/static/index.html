@@ -355,6 +355,7 @@ const S = {
   plan: { stage: 'input', text: '', suggested: [] },
   cp: { stage: 'pick', projectId: null, text: '', blocks: [], status: '', name: '', goal: '' },
   np: { open: false, name: '', goal: '' },
+  openStages: {},
   edit: { id: null, project_id: '', tags: '', due: '', effort: '' },
 };
 const OFFLINE_MSG = 'Servidor offline — suba o llama.cpp com docker compose up -d';
@@ -525,15 +526,116 @@ function taskRow(t, opts) {
     + '</div></div>';
 }
 
+// --- Etapas ----------------------------------------------------------------
+// O servidor já manda `overdue`, `days_overdue` e `is_current` calculados contra
+// o `db.today()` dele. Aqui é só apresentação — nada de refazer conta de data,
+// senão o relógio do navegador discordaria do que a CLI imprime.
+
+function entityKey(e) { return (e.kind === 'routine_run' ? 'r' : 'p') + e.id; }
+
+function stageSegments(e) {
+  if (!e.stages || !e.stages.length) return '';
+  return '<div class="sseg-row">' + e.stages.map(s => {
+    let cls = 'sseg';
+    if (s.done) cls += ' sseg-done';
+    else {
+      if (s.overdue) cls += ' sseg-late';
+      if (s.is_current) cls += ' sseg-cur';
+    }
+    const est = s.done ? ' — fechada' : (s.overdue ? ' — atrasada' : '');
+    return '<div class="' + cls + '" title="' + esc(s.name + est) + '"></div>';
+  }).join('') + '</div>';
+}
+
+function stageLine(e) {
+  const st = e.stages || [];
+  if (!st.length) return '<div class="sline">sem etapas · ' + e.tasks.done + '/' + e.tasks.total + ' tarefas</div>';
+  const cur = st.find(s => s.is_current);
+  if (!cur) return '<div class="sline">todas as ' + st.length + ' etapas fechadas</div>';
+
+  let txt = 'etapa ' + cur.position + '/' + st.length + ' · ' + cur.name;
+  let cls = 'sline';
+  if (cur.overdue) {
+    txt += ' · venceu ' + (cur.days_overdue === 1 ? 'ontem' : 'há ' + cur.days_overdue + ' dias');
+    cls += ' late';
+  } else if (cur.deadline === S.today) {
+    txt += ' · prazo hoje';
+    cls += ' today';
+  } else if (cur.deadline) {
+    txt += ' · até ' + fmtShort(cur.deadline);
+  }
+  // Atrasadas que não são a corrente viram sufixo discreto, não segunda marca vermelha.
+  const extra = e.stages_progress.overdue - (cur.overdue ? 1 : 0);
+  if (extra > 0) txt += ' (+' + extra + ' atrasada' + (extra > 1 ? 's' : '') + ')';
+  return '<div class="' + cls + '">' + esc(txt) + '</div>';
+}
+
+function currentCriteria(e) {
+  const cur = (e.stages || []).find(s => s.is_current);
+  if (!cur || !cur.done_criteria) return '';
+  return '<div class="scrit"><span class="scrit-kick">pronto quando</span>' + esc(cur.done_criteria) + '</div>';
+}
+
+function stageRows(e) {
+  return '<div style="margin-top:12px;">' + e.stages.map(s => {
+    let box = 'stbox';
+    if (s.done) box += ' done';
+    else if (s.overdue) box += ' late';
+    let due = '';
+    if (s.deadline) {
+      const late = s.overdue, hoje = s.deadline === S.today;
+      const rot = late ? '⚠ venceu ' + fmtShort(s.deadline) : (hoje ? 'prazo hoje' : 'até ' + fmtShort(s.deadline));
+      due = '<span class="stdue' + (late ? ' late' : (hoje ? ' today' : '')) + '">' + esc(rot) + '</span>';
+    }
+    const v = s.verdict
+      ? '<span class="verdict ' + (s.verdict.verdict === 'atende' ? 'ok' : (s.verdict.verdict === 'nao_atende' ? 'no' : '')) + '">' + esc(s.verdict.label) + '</span>'
+      : '';
+    return '<div class="strow' + (s.is_current ? ' strow-cur' : '') + '">'
+      + '<span class="' + box + '">' + (s.done ? '✓' : '') + '</span>'
+      + '<div style="flex:1; min-width:0;">'
+      + '<div style="display:flex; flex-wrap:wrap; align-items:baseline; gap:9px;">'
+      + '<span class="stname' + (s.done ? ' done' : '') + '">' + esc(s.name) + '</span>'
+      + due + v
+      + '<span class="pmini-prog">' + s.tasks.done + '/' + s.tasks.total + ' tarefas</span></div>'
+      + (s.done_criteria ? '<div class="scrit" style="margin-top:5px;"><span class="scrit-kick">pronto quando</span>' + esc(s.done_criteria) + '</div>' : '')
+      + (s.verdict && s.verdict.rationale ? '<div class="verdict-why">' + esc(s.verdict.rationale) + '</div>' : '')
+      + '</div></div>';
+  }).join('') + '</div>';
+}
+
+function stageToggle(e) {
+  if (!e.stages || !e.stages.length) return '';
+  const key = entityKey(e), open = !!S.openStages[key];
+  return '<button class="btn-link" style="margin-top:10px;" onclick="toggleStages(\'' + key + '\')">'
+    + (open ? 'ocultar etapas' : 'ver as ' + e.stages.length + ' etapas') + '</button>'
+    + (open ? stageRows(e) : '');
+}
+
+function toggleStages(key) {
+  S.openStages[key] = !S.openStages[key];
+  render();
+}
+
+function stageBar(e) {
+  // Com etapas, a barra passa a medir etapa fechada; tarefa vira dado secundário.
+  const sp = e.stages_progress;
+  const useStages = sp && sp.total;
+  const done = useStages ? sp.done : e.tasks.done;
+  const total = useStages ? sp.total : e.tasks.total;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  return '<div class="pbar-row"><div class="pbar"><div class="pbar-fill" style="width:' + pct + '%"></div></div>'
+    + '<span class="pmini-prog">' + done + '/' + total + (useStages ? ' etapas' : '') + '</span></div>';
+}
+
 function projMini(p) {
-  const pctv = p.tasks.total ? Math.round(p.tasks.done / p.tasks.total * 100) : 0;
   const late = p.deadline && p.active && p.deadline < S.today;
   return '<div class="pmini">'
     + '<div class="pmini-head"><span class="pmini-name">'
     + '<span class="proj-dot ' + projClass(p.id) + '"></span><span class="txt">' + esc(p.name) + '</span></span>'
     + '<span class="' + statusCls(p.tag) + '">' + esc(p.tag) + '</span></div>'
-    + '<div class="pbar-row"><div class="pbar"><div class="pbar-fill" style="width:' + pctv + '%"></div></div>'
-    + '<span class="pmini-prog">' + p.tasks.done + '/' + p.tasks.total + '</span></div>'
+    + stageSegments(p)
+    + stageBar(p)
+    + (p.stages.length ? stageLine(p) : '')
     + (p.deadline ? '<div class="pmini-dl" style="' + (late ? 'color:var(--warn);' : '') + '">entrega: ' + fmtShort(p.deadline) + (late ? ' • vencido' : '') + '</div>' : '')
     + '</div>';
 }
@@ -604,9 +706,13 @@ function renderProjetos() {
       + '<span class="proj-dot ' + projClass(p.id) + '"></span>' + esc(p.name) + '</span>'
       + '<span class="' + statusCls(p.tag) + '" style="padding:3px 8px;">' + esc(p.tag) + '</span></div>'
       + '<div class="pcard-goal">' + esc(p.goal) + '</div>'
+      + stageSegments(p)
+      + (p.stages.length ? stageLine(p) : '')
       + '<div class="pcard-meta"><span>' + p.tasks.done + '/' + p.tasks.total + ' tarefas</span>'
       + (p.deadline ? '<span style="' + (late ? 'color:var(--warn);' : '') + '">entrega ' + fmtShort(p.deadline) + (late ? ' • vencido' : '') + '</span>' : '')
-      + '</div>';
+      + '</div>'
+      + currentCriteria(p)
+      + stageToggle(p);
     if (tl.length) {
       html += '<div class="ptl">' + tl.map((c, i) => {
         const end = i === tl.length - 1;
