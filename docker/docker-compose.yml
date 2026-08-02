@@ -1,4 +1,4 @@
-# Servidor de inferência llama.cpp com CUDA, otimizado para RTX 3050 Laptop 4GB.
+# Servidor de inferência llama.cpp com CUDA, otimizado para RTX 3050 Laptop 6GB.
 # Sobe com: docker compose -f docker/docker-compose.yml up -d
 # Requer GPU acessível no Docker do WSL (ver README, seção Requisitos).
 
@@ -24,10 +24,11 @@ services:
       -c 8192
       --jinja
 
-  # Modo qualidade (opcional): Qwen3.5 9B com offload parcial — usa os 32GB de RAM.
+  # Modo qualidade (opcional): Qwen3.5 9B IQ4_XS inteiro na GPU (full offload).
   # Sobe com: docker compose -f docker/docker-compose.yml --profile quality up -d
-  # -ngl 18 medido em 3490 MiB de VRAM (cabe nos 4096 MiB da 3050 com margem;
-  # -ngl 24 estourava: 4280 MiB). -t 6 usa os P-cores do i7 13ª gen para o resto.
+  # IQ4_XS + KV q8_0 c=8192 medido em ~5.0GB de VRAM (4999 MiB na 4070, 2026-08-01)
+  # — cabe nos 6144 MiB da 3050 6GB com ~1.1GB de folga. ~80 t/s de geração na 4070
+  # (estimado ~30 t/s na 3050). NÃO roda junto com o `llm` (4B) nos 6GB: um por vez.
   llm-quality:
     profiles: ["quality"]
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
@@ -39,12 +40,11 @@ services:
     volumes:
       - ${WA_MODELS_DIR:-${HOME}/.ai-work-assistant/models}:/models
     command: >
-      -m /models/Qwen3.5-9B-Q4_K_M.gguf
+      -m /models/Qwen3.5-9B-IQ4_XS.gguf
       --alias qwen3.5-9b
       --host 0.0.0.0
       --port 8080
-      -ngl 18
-      -t 6
+      -ngl 99
       --flash-attn on
       --cache-type-k q8_0
       --cache-type-v q8_0

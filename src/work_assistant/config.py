@@ -16,9 +16,9 @@ LLM_BASE_URL = os.environ.get("WA_LLM_BASE_URL", "http://localhost:8080/v1")
 LLM_API_KEY = os.environ.get("WA_LLM_API_KEY", "sem-chave")  # llama.cpp ignora a chave
 LLM_MODEL = os.environ.get("WA_LLM_MODEL", "qwen3.5-4b")
 
-# Modelo "modo qualidade" opcional (ex.: Qwen3.5 9B com offload parcial),
+# Modelo "modo qualidade" opcional (ex.: Qwen3.5 9B inteiro na GPU em 6GB),
 # servido pelo profile `quality` do docker-compose em outra porta.
-# Se definido, o comando `wa standup` usa este modelo.
+# Se definido, o comando `wa review` usa este modelo.
 QUALITY_MODEL = os.environ.get("WA_QUALITY_MODEL", "")
 QUALITY_BASE_URL = os.environ.get("WA_QUALITY_BASE_URL", "http://localhost:8081/v1")
 
@@ -30,7 +30,16 @@ LLM_TIMEOUT_SECONDS = float(os.environ.get("WA_LLM_TIMEOUT", "120"))
 # a saída estruturada sempre roda sem thinking).
 ENABLE_THINKING = os.environ.get("WA_ENABLE_THINKING", "") == "1"
 
+# No caminho de qualidade (9B), thinking vem ligado por padrão: o modelo é
+# capaz e o ganho de raciocínio compensa. Só afeta texto livre (hoje, `wa review`);
+# a saída estruturada continua sempre sem thinking. WA_QUALITY_ENABLE_THINKING=0 desliga.
+QUALITY_ENABLE_THINKING = os.environ.get("WA_QUALITY_ENABLE_THINKING", "1") == "1"
+
 MAX_TOKENS = int(os.environ.get("WA_MAX_TOKENS", "2048"))
+
+# Com thinking ligado o modelo gasta tokens raciocinando antes da resposta;
+# o caminho de qualidade usa um teto maior para não truncar a resposta final.
+QUALITY_MAX_TOKENS = int(os.environ.get("WA_QUALITY_MAX_TOKENS", "4096"))
 
 # Interface web local (`wa web`)
 WEB_HOST = os.environ.get("WA_WEB_HOST", "127.0.0.1")

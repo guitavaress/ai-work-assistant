@@ -5,10 +5,10 @@ Assistente pessoal de trabalho rodando **100% local** com [llama.cpp](https://gi
 - **`wa plan`** — transforma seu relato do dia em um to-do priorizado (com ajuda do modelo).
 - **`wa todo`** — adiciona, lista e conclui tarefas do dia.
 - **`wa checkpoint`** — check-in de sprint: você relata o progresso de um projeto e o modelo avalia contra o objetivo da entrega, apontando riscos e próximos passos.
-- **`wa standup`** — gera a fala da daily a partir do seu histórico.
+- **`wa review`** — análise de execução do período: atrasos, lead time, trabalho não planejado e avaliação do modelo.
 - **`wa chat`** — conversa livre com o contexto das suas tarefas e projetos.
 
-Otimizado para rodar em notebook com GPU modesta (referência: **RTX 3050 Laptop 4GB** + 32GB RAM) em **Windows + WSL2 Ubuntu** com Docker.
+Otimizado para rodar em notebook com GPU modesta (referência: **RTX 3050 Laptop 6GB** + 32GB RAM) em **Windows + WSL2 Ubuntu** com Docker.
 
 ## Arquitetura
 
@@ -65,7 +65,7 @@ wa plan                          # de manhã: monta o to-do do dia com o modelo
 wa todo done 3                   # ao longo do dia: conclui tarefas
 wa project add "API v2" -g "Publicar API v2 com autenticação até a sprint 14"
 wa checkpoint "API v2"           # 1–2x por semana: check-in de progresso
-wa standup                       # antes da daily: resumo pronto para falar
+wa review                        # a cada sprint: análise de atrasos, tempos e trabalho não planejado
 ```
 
 ## Interface web
@@ -81,12 +81,12 @@ wa web --no-browser
 - **Projetos** — cards com objetivo, tag de situação (`no rumo` / `em risco`) derivada do último checkpoint e timeline de check-ins.
 - **Chat** — conversa com o contexto das suas tarefas e projetos.
 - **Histórico** — navegação pelos to-dos de dias anteriores.
-- Checkpoint e standup abrem em modais com a avaliação em blocos (Situação/Riscos/Próximo passo e Ontem/Hoje/Impedimentos, com botão de copiar).
+- Checkpoint abre em modal com a avaliação em blocos (Situação/Riscos/Próximo passo), com botão de copiar.
 - Tema claro/escuro (persistido no navegador) e indicador de status do servidor llama.cpp no topo — ações de modelo avisam quando o servidor está fora do ar.
 
-## Otimização para RTX 3050 4GB
+## Otimização para RTX 3050 6GB
 
-O `docker-compose.yml` já vem com as flags ajustadas para 4GB de VRAM:
+O `docker-compose.yml` já vem com as flags ajustadas para caber com folga nos 6GB (o 4B padrão usa ~3.2GB):
 
 | Flag | Por quê |
 |---|---|
@@ -100,11 +100,13 @@ Monitore com `nvidia-smi` na primeira execução: medido em **3164 MiB** de VRAM
 
 ### Modo qualidade (opcional)
 
-Com 32GB de RAM dá para rodar o **Qwen3.5 9B** com offload parcial (`-ngl 18`, medido em 3490 MiB de VRAM; ~6–9 tok/s estimados na 3050 — bom para o standup, ruim para chat). Baixe com `python3 scripts/download_model.py --quality`, suba com `docker compose -f docker/docker-compose.yml --profile quality up -d` e aponte o standup para ele:
+Nos 6GB dá para rodar o **Qwen3.5 9B** (quant IQ4_XS) **inteiro na GPU** (`-ngl 99`) — raciocínio bem melhor que o 4B, com thinking ligado. Medido em **~5.0GB de VRAM** (cabe nos 6GB com ~1.1GB de folga) e **~80 t/s** de geração na 4070 (estimado ~30 t/s na 3050) — muito acima do offload parcial anterior. O `wa review` usa este modelo quando ativado. Baixe com `python3 scripts/download_model.py --quality`, suba com `docker compose -f docker/docker-compose.yml --profile quality up -d` e aponte o assistente para ele:
 
 ```bash
 export WA_QUALITY_MODEL=qwen3.5-9b
 ```
+
+> O 4B (padrão) e o 9B (qualidade) **não cabem juntos** nos 6GB — suba um profile por vez.
 
 ## Configuração
 
@@ -115,11 +117,13 @@ Variáveis de ambiente (todas opcionais):
 | `WA_DATA_DIR` | `~/.ai-work-assistant` | Onde ficam o SQLite e os modelos |
 | `WA_LLM_BASE_URL` | `http://localhost:8080/v1` | Endpoint do servidor llama.cpp |
 | `WA_LLM_MODEL` | `qwen3.5-4b` | Nome do modelo padrão |
-| `WA_QUALITY_MODEL` | *(vazio)* | Modelo usado pelo `wa standup`, se definido |
+| `WA_QUALITY_MODEL` | *(vazio)* | Modelo usado pelo `wa review`, se definido |
 | `WA_QUALITY_BASE_URL` | `http://localhost:8081/v1` | Endpoint do servidor do modo qualidade |
 | `WA_LLM_TIMEOUT` | `120` | Timeout das chamadas ao modelo (s) |
-| `WA_ENABLE_THINKING` | *(desligado)* | `1` ativa o modo thinking do Qwen nas respostas de texto (mais qualidade, bem mais lento) |
+| `WA_ENABLE_THINKING` | *(desligado)* | `1` ativa o modo thinking do Qwen nas respostas de texto do modelo padrão (mais qualidade, bem mais lento) |
+| `WA_QUALITY_ENABLE_THINKING` | `1` (ligado) | Thinking no caminho de qualidade (9B); `0` desliga. Só afeta texto livre — a saída estruturada nunca usa thinking |
 | `WA_MAX_TOKENS` | `2048` | Limite de tokens por resposta |
+| `WA_QUALITY_MAX_TOKENS` | `4096` | Limite de tokens no caminho de qualidade (espaço para o thinking + resposta) |
 | `WA_WEB_HOST` | `127.0.0.1` | Host da interface web (`wa web`) |
 | `WA_WEB_PORT` | `8765` | Porta da interface web |
 | `WA_USER_NAME` | *(vazio)* | Nome usado na saudação da interface web |

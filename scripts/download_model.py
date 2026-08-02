@@ -4,7 +4,7 @@
 Usa só a biblioteca padrão para funcionar antes de qualquer `pip install`.
 
     python3 scripts/download_model.py             # Qwen3.5 4B Q4_K_M (padrão, ~2.7GB)
-    python3 scripts/download_model.py --quality   # Qwen3.5 9B Q4_K_M (~5.7GB)
+    python3 scripts/download_model.py --quality   # Qwen3.5 9B IQ4_XS (~5.2GB)
 """
 
 import argparse
@@ -19,8 +19,8 @@ MODELS = {
         "Qwen3.5-4B-Q4_K_M.gguf",
     ),
     "quality": (
-        "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf",
-        "Qwen3.5-9B-Q4_K_M.gguf",
+        "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-IQ4_XS.gguf",
+        "Qwen3.5-9B-IQ4_XS.gguf",
     ),
 }
 
