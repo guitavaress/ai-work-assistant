@@ -68,7 +68,8 @@ class TaskEditIn(BaseModel):
 
 
 def _project_map(conn) -> dict[int, str]:
-    return {p.id: p.name for p in db.list_projects(conn, include_done=True)}
+    # kind=None: a tarefa de um ciclo de rotina também precisa exibir o nome do ciclo.
+    return {p.id: p.name for p in db.list_projects(conn, include_done=True, kind=None)}
 
 
 def _task_out(t: db.Task, project_map: dict[int, str] | None = None) -> dict:
@@ -96,7 +97,6 @@ def _project_out(conn, p: db.Project) -> dict:
         tag = "sem checkpoint"
     else:
         tag = checkpoints[-1].status or "sem checkpoint"
-    project_tasks = db.list_tasks_by_project(conn, p.id)
     return {
         "id": p.id,
         "name": p.name,
@@ -104,10 +104,7 @@ def _project_out(conn, p: db.Project) -> dict:
         "deadline": p.deadline,
         "active": p.status == "active",
         "tag": tag,
-        "tasks": {
-            "total": len(project_tasks),
-            "done": sum(1 for t in project_tasks if t.status == "done"),
-        },
+        "tasks": db.project_progress(conn, p.id),
         "timeline": [
             {
                 "date": c.created_at[:10],
@@ -140,6 +137,7 @@ def health():
 @app.get("/api/state")
 def state(day: str | None = None):
     conn = db.connect()
+    services.ensure_routines(conn)
     today = db.today()
     project_map = _project_map(conn)
     return {
@@ -149,6 +147,13 @@ def state(day: str | None = None):
         "model": config.LLM_MODEL,
         "tasks": [_task_out(t, project_map) for t in db.list_tasks(conn, day=day)],
         "projects": [_project_out(conn, p) for p in db.list_projects(conn, include_done=True)],
+        # Ciclos de rotina vêm numa chave própria: fora de `projects` para não poluir a
+        # aba Projetos, mas disponíveis para o popover de edição — sem eles o <select>
+        # não teria a opção da tarefa e o save apagaria o vínculo em silêncio.
+        "routine_runs": [
+            _project_out(conn, p)
+            for p in db.list_projects(conn, include_done=True, kind="routine_run")
+        ],
     }
 
 

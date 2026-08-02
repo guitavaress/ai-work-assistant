@@ -278,7 +278,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 const S = {
   view: 'hoje',
   today: null, viewDay: null, userName: '', model: '…', online: true,
-  tasks: [], projects: [],
+  tasks: [], projects: [], routine_runs: [],
   histDay: null, histTasks: [],
   chat: [], chatThinking: false,
   review: { days: 14, metrics: null, assessment: '', thinking: false },
@@ -358,6 +358,7 @@ async function loadState() {
   S.model = st.model;
   S.tasks = st.tasks;
   S.projects = st.projects;
+  S.routine_runs = st.routine_runs || [];
   if (!S.viewDay) S.viewDay = st.today;
   if (!S.histDay) S.histDay = st.today;
   render();
@@ -905,7 +906,10 @@ function renderModal() {
         + '<button class="btn-primary" onclick="savePlan()">Salvar no to-do de hoje</button></div>';
     }
   } else if (S.modal === 'edit') {
-    const active = S.projects.filter(p => p.active || p.id === S.edit.project_id);
+    // Inclui os ciclos de rotina: sem eles, uma tarefa de ciclo abriria o popover sem
+    // a própria opção e o save gravaria "sem projeto", perdendo o vínculo.
+    const active = S.projects.concat(S.routine_runs)
+      .filter(p => p.active || p.id === S.edit.project_id);
     inner = '<div class="modal-title">Editar tarefa</div>'
       + '<div class="modal-sub" style="font-size:13.5px;">Projeto, tags, prazo e esforço.</div>'
       + '<div class="efield"><label>Projeto</label>'

@@ -14,6 +14,8 @@ console = Console()
 def plan():
     """Conversa curta que transforma seu relato do dia em um to-do priorizado."""
     conn = db.connect()
+    # Antes do suggest_plan: o ciclo aberto hoje precisa entrar no contexto do modelo.
+    services.ensure_routines(conn)
     relato = typer.prompt("O que você tem para hoje? (reuniões, entregas, pendências)")
 
     with console.status("Planejando o dia..."):

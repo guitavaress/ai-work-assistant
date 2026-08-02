@@ -10,7 +10,11 @@ import urllib.error
 import urllib.request
 from datetime import date, datetime, timedelta
 
-from work_assistant import config, context, db, llm
+from work_assistant import config, context, db, llm, schedule
+
+# Teto de segurança do backfill: uma rotina parada há meses não deve gerar
+# dezenas de ciclos no primeiro comando (o piso real é o created_at da rotina).
+ROUTINE_LOOKBACK_DAYS = 92
 
 PLAN_SCHEMA = {
     "type": "object",
@@ -61,6 +65,7 @@ def suggest_plan(conn: sqlite3.Connection, relato: str) -> list[dict]:
         f"Hoje é {db.today()}.\n\n"
         f"Tarefas já pendentes hoje:\n{context.tasks_block(conn)}\n\n"
         f"Projetos ativos:\n{context.projects_block(conn)}\n\n"
+        f"Rotinas em andamento:\n{context.routine_runs_block(conn)}\n\n"
         f"Tags já usadas: {tags_line}\n\n"
         f"Relato do usuário:\n{relato}"
     )
@@ -90,20 +95,133 @@ def save_plan(conn: sqlite3.Connection, tasks: list[dict]) -> list[db.Task]:
     return saved
 
 
+# --- Rotinas ----------------------------------------------------------------
+
+
+def materialize_run(
+    conn: sqlite3.Connection, routine: db.Routine, period: str
+) -> db.Project:
+    """Cria o ciclo do período (ou devolve o existente) com as etapas do checklist.
+
+    As etapas são CÓPIA do checklist da rotina, não referência: o ciclo é o registro
+    do que se pediu naquele período, e editar a rotina depois não reescreve o passado.
+    """
+    existing = db.find_routine_run(conn, routine.id, period)
+    if existing is not None:
+        return existing
+
+    opening = schedule.opens_on(routine.cadence, routine.anchor, period)
+    deadline = schedule.closes_on(
+        routine.cadence, routine.anchor, routine.sla_days, period
+    )
+    name = f"{routine.name} — {period}"
+    try:
+        run = db.add_routine_run(
+            conn, routine.id, period, name, routine.goal, deadline.isoformat()
+        )
+    except sqlite3.IntegrityError:
+        # Ou outra sessão (web/CLI) materializou o mesmo ciclo, ou o nome colidiu
+        # com um projeto que o usuário criou na mão.
+        concurrent = db.find_routine_run(conn, routine.id, period)
+        if concurrent is not None:
+            return concurrent
+        run = db.add_routine_run(
+            conn, routine.id, period, f"{name} (#{routine.id})", routine.goal, deadline.isoformat()
+        )
+
+    for step in db.list_routine_steps(conn, routine.id):
+        db.add_stage(
+            conn,
+            run.id,
+            step.name,
+            deadline=(opening + timedelta(days=step.offset_days)).isoformat(),
+            done_criteria=step.done_criteria,
+            position=step.position,
+        )
+    return run
+
+
+def ensure_routines(
+    conn: sqlite3.Connection, today: str | None = None
+) -> list[db.Project]:
+    """Materializa os ciclos cuja janela já abriu. Idempotente.
+
+    Chamada pelos comandos que leem o dia (to-do, plan, web) — sem daemon nem cron.
+    Devolve só os ciclos criados agora, para quem quiser avisar o usuário.
+    """
+    routines = db.list_routines(conn)
+    if not routines:
+        return []
+
+    now = date.fromisoformat(today or db.today())
+    floor = now - timedelta(days=ROUTINE_LOOKBACK_DAYS)
+    created = []
+    for routine in routines:
+        start = max(date.fromisoformat(routine.created_at[:10]), floor)
+        for period in schedule.periods_between(
+            routine.cadence, routine.anchor, start, now
+        ):
+            if db.find_routine_run(conn, routine.id, period) is None:
+                created.append(materialize_run(conn, routine, period))
+    return created
+
+
+def close_routine_run(conn: sqlite3.Connection, project: db.Project) -> db.Project:
+    """Fecha o ciclo. Sempre manual: ver a janela do mês passado aberta é o sinal."""
+    return db.complete_project(conn, project.id)
+
+
+def routine_view(conn: sqlite3.Connection, routine: db.Routine) -> dict:
+    """Rotina + checklist + ciclos com progresso + próxima abertura (para `wa routine show`)."""
+    runs = []
+    for run in db.list_routine_runs(conn, routine.id):
+        stages = db.list_stages(conn, run.id)
+        runs.append(
+            {
+                "project": run,
+                "tasks": db.project_progress(conn, run.id),
+                "stages": {
+                    "total": len(stages),
+                    "done": sum(1 for s in stages if s.status == "done"),
+                },
+            }
+        )
+    return {
+        "routine": routine,
+        "cadence": schedule.describe(routine.cadence, routine.anchor, routine.sla_days),
+        "steps": db.list_routine_steps(conn, routine.id),
+        "runs": runs,
+        "next_open": schedule.next_open(
+            routine.cadence, routine.anchor, date.fromisoformat(db.today())
+        ),
+    }
+
+
 # --- Checkpoint -------------------------------------------------------------
 
 
-def run_checkpoint(conn: sqlite3.Connection, project: db.Project, progress: str) -> dict:
+def run_checkpoint(
+    conn: sqlite3.Connection,
+    project: db.Project,
+    progress: str,
+    stage: db.Stage | None = None,
+) -> dict:
     """Avalia o relato contra o objetivo do projeto e salva o checkpoint.
+
+    Com etapas cadastradas, o modelo recebe prazos e critérios de pronto — é o que
+    permite julgar contra régua verificável em vez da impressão do relato.
 
     Retorna a avaliação em blocos (para a web) e em markdown (para a CLI).
     """
     deadline = f"Prazo da entrega: {project.deadline}\n" if project.deadline else ""
+    focus = f"Etapa em foco: {stage.name}\n" if stage else ""
+    stages = context.stages_block(conn, project.id, stage_id=stage.id if stage else None)
     user_message = (
         f"Hoje é {db.today()}.\n"
         f"Projeto: {project.name}\n"
         f"Objetivo da entrega: {project.goal}\n"
-        f"{deadline}\n"
+        f"{deadline}{focus}\n"
+        f"Etapas do projeto:\n{stages}\n\n"
         f"Checkpoints anteriores:\n{context.checkpoints_block(conn, project.id)}\n\n"
         f"Relato de hoje:\n{progress}"
     )
@@ -121,6 +239,7 @@ def run_checkpoint(conn: sqlite3.Connection, project: db.Project, progress: str)
         markdown,
         status=result["status"],
         summary=result["resumo"],
+        stage_id=stage.id if stage else None,
     )
     return {
         "blocks": [
@@ -207,7 +326,10 @@ def review_metrics(conn: sqlite3.Connection, days: int = 14) -> dict:
     for t in tasks:
         if t.project_id:
             grouped_by_project.setdefault(t.project_id, []).append(t)
-    project_names = {p.id: p.name for p in db.list_projects(conn, include_done=True)}
+    # kind=None: ciclos de rotina também precisam de nome nas métricas.
+    project_names = {
+        p.id: p.name for p in db.list_projects(conn, include_done=True, kind=None)
+    }
     by_project = {
         str(pid): {
             "name": project_names.get(pid, f"Projeto #{pid}"),
@@ -301,6 +423,7 @@ def chat_system(conn: sqlite3.Connection) -> str:
         llm.load_prompt("chat")
         + f"\n\nTarefas de hoje:\n{context.tasks_block(conn)}"
         + f"\n\nProjetos ativos:\n{context.projects_block(conn)}"
+        + f"\n\nRotinas em andamento:\n{context.routine_runs_block(conn)}"
     )
 
 
