@@ -349,3 +349,76 @@ def test_llm_offline_returns_503(client, conn, monkeypatch):
     resp = client.post("/api/plan", json={"relato": "meu dia"})
     assert resp.status_code == 503
     assert "offline" in resp.json()["detail"]
+
+
+# --- Etapas e ciclos de rotina ----------------------------------------------
+
+
+def _rotina(conn):
+    """Rotina mensal que abre no dia 1, cadastrada no mês anterior.
+
+    O created_at é recuado de propósito: uma rotina criada depois da abertura do
+    período não materializa o ciclo corrente (é o que `wa routine run` resolve).
+    """
+    routine = db.add_routine(conn, "Janela de Comissões", "fechar no SLA", "monthly", 1, sla_days=4)
+    db.replace_routine_steps(
+        conn,
+        routine.id,
+        [{"name": "Extrair base", "offset_days": 0}, {"name": "Reconciliar", "offset_days": 1}],
+    )
+    inicio_do_mes = db.today()[:8] + "01"
+    conn.execute("UPDATE routines SET created_at = ? WHERE id = ?", (inicio_do_mes, routine.id))
+    conn.commit()
+    return db.get_routine(conn, routine.id)
+
+
+def test_state_materializes_and_separates_routine_runs(client, conn):
+    db.add_project(conn, "Migração Glue", "meta")
+    _rotina(conn)
+
+    state = client.get("/api/state").json()
+    assert [p["name"] for p in state["projects"]] == ["Migração Glue"]
+    assert len(state["routine_runs"]) == 1
+    assert state["routine_runs"][0]["name"].startswith("Janela de Comissões — ")
+
+
+def test_state_is_idempotent_across_requests(client, conn):
+    _rotina(conn)
+    client.get("/api/state")
+    client.get("/api/state")
+    assert len(db.list_projects(conn, kind="routine_run")) == 1
+
+
+def test_routine_run_task_keeps_its_project_name(client, conn):
+    """Sem kind=None no _project_map a tarefa do ciclo apareceria sem projeto."""
+    _rotina(conn)
+    client.get("/api/state")  # materializa
+    ciclo = db.list_projects(conn, kind="routine_run")[0]
+    stage = db.list_stages(conn, ciclo.id)[0]
+    task = db.add_task(conn, "Baixar arquivo", stage_id=stage.id)
+
+    state = client.get("/api/state").json()
+    linha = next(t for t in state["tasks"] if t["id"] == task.id)
+    assert linha["project_id"] == ciclo.id
+    assert linha["project_name"] == ciclo.name
+
+
+def test_editing_a_routine_run_task_keeps_the_link(client, conn):
+    """Regressão do popover: salvar sem mexer no projeto não pode desvincular."""
+    _rotina(conn)
+    client.get("/api/state")
+    ciclo = db.list_projects(conn, kind="routine_run")[0]
+    task = db.add_task(conn, "Baixar arquivo", project_id=ciclo.id)
+
+    r = client.post(f"/api/tasks/{task.id}", json={"project_id": ciclo.id, "tags": ["dados"]})
+    assert r.status_code == 200
+    assert db.get_task(conn, task.id).project_id == ciclo.id
+
+
+def test_project_out_uses_canonical_progress(client, conn):
+    p = db.add_project(conn, "Janela", "meta")
+    a = db.add_task(conn, "uma", project_id=p.id)
+    db.add_task(conn, "outra", project_id=p.id)
+    db.complete_task(conn, a.id)
+    state = client.get("/api/state").json()
+    assert state["projects"][0]["tasks"] == {"total": 2, "done": 1}

@@ -1,7 +1,7 @@
 """Cliente para o servidor llama.cpp (API OpenAI-compatible).
 
 O servidor sobe via `docker compose -f docker/docker-compose.yml up` e expõe
-http://localhost:8080/v1. A saída estruturada usa `json_schema`, que o
+http://localhost:8090/v1. A saída estruturada usa `json_schema`, que o
 llama.cpp converte em gramática GBNF — garante JSON válido mesmo em modelos
 pequenos como o Qwen3.5 4B.
 """
@@ -32,7 +32,7 @@ def complete(
     """Chat simples: retorna o texto da resposta.
 
     Com quality=True e WA_QUALITY_MODEL definido, usa o servidor do modelo
-    de qualidade (porta 8081 no docker-compose) em vez do padrão, com thinking
+    de qualidade (porta 8091 no docker-compose) em vez do padrão, com thinking
     ligado (WA_QUALITY_ENABLE_THINKING) e teto de tokens maior (QUALITY_MAX_TOKENS).
     """
     if quality and config.QUALITY_MODEL:

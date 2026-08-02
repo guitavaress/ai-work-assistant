@@ -4,6 +4,8 @@ Assistente pessoal de trabalho rodando **100% local** com [llama.cpp](https://gi
 
 - **`wa plan`** — transforma seu relato do dia em um to-do priorizado (com ajuda do modelo).
 - **`wa todo`** — adiciona, lista e conclui tarefas do dia.
+- **`wa project`** — entregas finitas, divididas em **etapas** com prazo e critério de pronto.
+- **`wa routine`** — trabalho recorrente (fechamento mensal, janela de comissões): você define a janela e o checklist uma vez, e o ciclo de cada período abre sozinho.
 - **`wa checkpoint`** — check-in de sprint: você relata o progresso de um projeto e o modelo avalia contra o objetivo da entrega, apontando riscos e próximos passos.
 - **`wa review`** — análise de execução do período: atrasos, lead time, trabalho não planejado e avaliação do modelo.
 - **`wa chat`** — conversa livre com o contexto das suas tarefas e projetos.
@@ -22,7 +24,7 @@ Otimizado para rodar em notebook com GPU modesta (referência: **RTX 3050 Laptop
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-- O **servidor de inferência** roda em Docker (imagem oficial CUDA do llama.cpp) e expõe uma API OpenAI-compatible em `http://localhost:8080/v1`.
+- O **servidor de inferência** roda em Docker (imagem oficial CUDA do llama.cpp) e expõe uma API OpenAI-compatible em `http://localhost:8090/v1`.
 - A **CLI** roda nativa no Ubuntu e guarda seus dados em SQLite (`~/.ai-work-assistant/`).
 - Modelo padrão: **Qwen3.5 4B Instruct (Q4_K_M)** — ver [avaliação de modelos](docs/model-evaluation.md).
 
@@ -67,6 +69,54 @@ wa project add "API v2" -g "Publicar API v2 com autenticação até a sprint 14"
 wa checkpoint "API v2"           # 1–2x por semana: check-in de progresso
 wa review                        # a cada sprint: análise de atrasos, tempos e trabalho não planejado
 ```
+
+### Projetos com etapas
+
+Uma entrega raramente é um bloco só. Etapas dão prazo próprio a cada pedaço e, principalmente,
+um **critério de pronto** — o que o modelo passa a usar como régua no checkpoint, em vez de
+opinar sobre a impressão que o seu relato passa.
+
+```bash
+wa project stage add "API v2" "Autenticação" -D 2026-09-10 -c "login e refresh token com teste de integração passando"
+wa project stage list "API v2"
+wa todo add "Implementar refresh token" -P "API v2" -S "Autenticação"
+wa project stage done "API v2" "Autenticação"
+wa checkpoint "API v2" -S "Autenticação"    # avalia a etapa contra o critério
+```
+
+### Rotinas: o trabalho que volta todo mês
+
+Projeto termina; rotina não. Se você fecha comissões todo início de mês, isso não é um projeto
+novo a cada 30 dias — é uma **janela** com SLA que se repete. Você cadastra o molde uma vez:
+
+```bash
+wa routine add "Janela de Comissões" \
+  -g "comissões apuradas, conciliadas e comunicadas dentro do SLA" \
+  --cadence monthly --opens 1 --sla-days 4     # abre dia 1, prazo dia 5
+
+wa routine steps "Janela de Comissões"   # abre o $EDITOR: uma etapa por linha
+```
+
+No `$EDITOR`, o checklist é texto simples — `nome | dias após a abertura | critério de pronto`:
+
+```
+Extrair base de comissões | 0 | arquivo bruto na landing, contagem bate com a origem
+Reconciliar com o extrato | 1 | diferença < 0,01% contra o extrato do banco
+Publicar e comunicar      | 2 | e-mail enviado e dashboard atualizado
+```
+
+A partir daí o ciclo de cada período abre sozinho quando a janela chega — sem daemon e sem cron,
+basta você usar o app. Se ficar dias sem abrir, os ciclos perdidos são recuperados de uma vez.
+
+```bash
+wa routine list                    # cadência, nº de etapas e estado do ciclo atual
+wa routine show "Janela de Comissões"
+wa routine run "Janela de Comissões" -p 2026-08   # materializa um período na mão
+wa routine close "Janela de Comissões"            # fechar é sempre manual
+```
+
+Os ciclos ficam fora do `wa project list` (veja com `-r`), mas suas tarefas aparecem
+normalmente no to-do do dia e entram no contexto do `wa plan`.
 
 ## Interface web
 
@@ -115,10 +165,10 @@ Variáveis de ambiente (todas opcionais):
 | Variável | Padrão | Descrição |
 |---|---|---|
 | `WA_DATA_DIR` | `~/.ai-work-assistant` | Onde ficam o SQLite e os modelos |
-| `WA_LLM_BASE_URL` | `http://localhost:8080/v1` | Endpoint do servidor llama.cpp |
+| `WA_LLM_BASE_URL` | `http://localhost:8090/v1` | Endpoint do servidor llama.cpp |
 | `WA_LLM_MODEL` | `qwen3.5-4b` | Nome do modelo padrão |
 | `WA_QUALITY_MODEL` | *(vazio)* | Modelo usado pelo `wa review`, se definido |
-| `WA_QUALITY_BASE_URL` | `http://localhost:8081/v1` | Endpoint do servidor do modo qualidade |
+| `WA_QUALITY_BASE_URL` | `http://localhost:8091/v1` | Endpoint do servidor do modo qualidade |
 | `WA_LLM_TIMEOUT` | `120` | Timeout das chamadas ao modelo (s) |
 | `WA_ENABLE_THINKING` | *(desligado)* | `1` ativa o modo thinking do Qwen nas respostas de texto do modelo padrão (mais qualidade, bem mais lento) |
 | `WA_QUALITY_ENABLE_THINKING` | `1` (ligado) | Thinking no caminho de qualidade (9B); `0` desliga. Só afeta texto livre — a saída estruturada nunca usa thinking |
