@@ -15,6 +15,7 @@ body {
   --dim:#6E6A5F; --faint:#B9B4A6; --accent:#2E6B4F; --accent-ink:#FFFFFF;
   --accent-soft:#EDF3EE; --accent-border:#CFE0D4; --accent-text:#2A4A3A;
   --amber:#B07A16; --amber-bg:#F5EAD0; --warn:#C2542E; --warn-bg:#F6E1D8;
+  --cycle:#2F5D6B; --cycle-soft:#E8F0F2; --cycle-border:#C6DBE0; --cycle-text:#274C57;
   --chip:#EFECE3; --p1bg:#F6E8DE; --p1ink:#8A4B2D; --btn:#F3F0E9;
   --ok:#3E9B6B; --overlay:rgba(20,19,16,0.45); --shadow:rgba(28,27,24,0.08);
   --pc0bg:#F6E8DE; --pc0ink:#8A4B2D; --pc1bg:#E3EDF7; --pc1ink:#2D5C8A;
@@ -26,6 +27,7 @@ body.dark {
   --dim:#A8A296; --faint:#6E6A5F; --accent:#4E9C74; --accent-ink:#0E1F17;
   --accent-soft:#1E2A23; --accent-border:#2E4A3B; --accent-text:#A8D5BC;
   --amber:#D9AB4E; --amber-bg:#3A311C; --warn:#E07B52; --warn-bg:#3A2417;
+  --cycle:#77B2C1; --cycle-soft:#1B2A2F; --cycle-border:#31505A; --cycle-text:#A9CFD9;
   --chip:#2A2822; --p1bg:#3A2417; --p1ink:#E5A583; --btn:#262420;
   --ok:#4FBF85; --overlay:rgba(0,0,0,0.55); --shadow:rgba(0,0,0,0.35);
   --pc0bg:#3A2417; --pc0ink:#E5A583; --pc1bg:#1E2E3D; --pc1ink:#8FBBDD;
@@ -143,6 +145,73 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .proj-chip.c3 { background: var(--pc3bg); color: var(--pc3ink); } .proj-dot.c3 { background: var(--pc3ink); }
 .proj-chip.c4 { background: var(--pc4bg); color: var(--pc4ink); } .proj-dot.c4 { background: var(--pc4ink); }
 .proj-chip.c5 { background: var(--pc5bg); color: var(--pc5ink); } .proj-dot.c5 { background: var(--pc5ink); }
+
+/* Ciclos de rotina — superfície própria para não se confundir com projeto */
+.ccard { background: var(--cycle-soft); border: 1px solid var(--cycle-border); border-radius: 14px; padding: 20px 24px; }
+.ccard.done { background: var(--card); border-color: var(--border); }
+.ckicker { font-family: var(--font-mono); font-size: 12px; color: var(--cycle); text-transform: uppercase; letter-spacing: 0.6px; display: flex; align-items: center; gap: 7px; }
+.ccard.done .ckicker { color: var(--faint); }
+.cname { font-size: 18px; font-weight: 600; margin-top: 3px; }
+.cgoal { font-size: 14px; color: var(--dim); margin-top: 3px; }
+.cmeta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
+.sla { font-weight: 600; color: var(--dim); }
+.sla.soon { color: var(--amber); }
+.sla.warn { color: var(--warn); }
+
+/* Etapas: tira de segmentos (sempre visível) + linha de situação */
+.sseg-row { display: flex; gap: 3px; margin-top: 14px; }
+.sseg { flex: 1; height: 6px; border-radius: 999px; background: var(--chip); }
+.sseg-done { background: var(--accent); }
+.sseg-cur { background: var(--accent-border); }
+.sseg-late { background: var(--amber); }
+/* Só a etapa corrente E atrasada usa vermelho: com 3 ciclos abertos, no
+   máximo 3 marcas vermelhas na tela. */
+.sseg-late.sseg-cur { background: var(--warn); }
+.sline { font-family: var(--font-mono); font-size: 12px; color: var(--dim); margin-top: 9px; }
+.sline.today { color: var(--amber); }
+.sline.late { color: var(--warn); }
+.scrit { font-size: 13px; color: var(--dim); margin-top: 8px; line-height: 1.45; }
+.scrit-kick { font-family: var(--font-mono); font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 6px; }
+
+/* Etapas: lista completa (só ao expandir) */
+.strow { display: flex; gap: 11px; padding: 11px 14px; border-top: 1px solid var(--line); }
+.strow-cur { background: var(--bg); }
+.stbox { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--faint); flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--accent-ink); }
+.stbox.done { background: var(--accent); border-color: var(--accent); }
+.stbox.late { border-color: var(--warn); }
+.stname { font-size: 13.5px; }
+.strow-cur .stname { font-weight: 600; }
+.stname.done { text-decoration: line-through; color: var(--dim); }
+.stdue { font-family: var(--font-mono); font-size: 11px; padding: 1px 7px; border-radius: 4px; background: var(--chip); color: var(--dim); white-space: nowrap; }
+.stdue.today { background: var(--amber-bg); color: var(--amber); }
+.stdue.late { background: var(--warn-bg); color: var(--warn); }
+
+/* Veredito do modelo por etapa */
+.verdict { font-family: var(--font-mono); font-size: 10.5px; padding: 1px 7px; border-radius: 4px; background: var(--chip); color: var(--dim); white-space: nowrap; }
+.verdict.ok { background: var(--accent-soft); color: var(--accent); }
+.verdict.no { background: var(--warn-bg); color: var(--warn); }
+.verdict-why { font-size: 12.5px; color: var(--dim); margin-top: 5px; line-height: 1.45; }
+
+/* Ritual do dia */
+.ritual { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.ritual-item { display: flex; align-items: baseline; gap: 8px; }
+.ritual-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--faint); }
+.ritual-now .ritual-dot { background: var(--warn); }
+.ritual-open .ritual-dot { background: var(--amber); }
+.ritual-calm .ritual-dot { background: var(--faint); }
+.ritual-text { font-size: 13.5px; line-height: 1.4; }
+.ritual-detail { font-size: 12.5px; color: var(--dim); }
+.ritual-empty { font-size: 13px; color: var(--dim); margin-top: 10px; }
+
+/* Análise: onde seu tempo foi (rotina x projeto) */
+.split-head { font-size: 36px; font-weight: 600; letter-spacing: -0.8px; color: var(--cycle); }
+.split { display: flex; gap: 4px; margin-top: 18px; }
+.split-run { background: var(--cycle); height: 14px; border-radius: 999px; }
+.split-change { background: var(--accent); height: 14px; border-radius: 999px; }
+.split-legend { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 14px; font-family: var(--font-mono); font-size: 12px; }
+.split-legend .run { color: var(--cycle); }
+.split-legend .change { color: var(--accent); }
+.split-note { font-size: 13.5px; color: var(--dim); margin-top: 14px; line-height: 1.5; max-width: 640px; }
 
 /* Projetos view */
 .stackv { display: flex; flex-direction: column; gap: 22px; }
