@@ -12,7 +12,9 @@ DB_PATH = DATA_DIR / "assistant.db"
 MODELS_DIR = DATA_DIR / "models"
 
 # Servidor llama.cpp (OpenAI-compatible)
-LLM_BASE_URL = os.environ.get("WA_LLM_BASE_URL", "http://localhost:8080/v1")
+# Porta 8090 no host (a 8080 costuma estar ocupada pelo Airflow); dentro do
+# container o llama.cpp continua na 8080.
+LLM_BASE_URL = os.environ.get("WA_LLM_BASE_URL", "http://localhost:8090/v1")
 LLM_API_KEY = os.environ.get("WA_LLM_API_KEY", "sem-chave")  # llama.cpp ignora a chave
 LLM_MODEL = os.environ.get("WA_LLM_MODEL", "qwen3.5-4b")
 
@@ -20,7 +22,7 @@ LLM_MODEL = os.environ.get("WA_LLM_MODEL", "qwen3.5-4b")
 # servido pelo profile `quality` do docker-compose em outra porta.
 # Se definido, o comando `wa review` usa este modelo.
 QUALITY_MODEL = os.environ.get("WA_QUALITY_MODEL", "")
-QUALITY_BASE_URL = os.environ.get("WA_QUALITY_BASE_URL", "http://localhost:8081/v1")
+QUALITY_BASE_URL = os.environ.get("WA_QUALITY_BASE_URL", "http://localhost:8091/v1")
 
 LLM_TIMEOUT_SECONDS = float(os.environ.get("WA_LLM_TIMEOUT", "120"))
 

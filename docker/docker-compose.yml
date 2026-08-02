@@ -9,7 +9,9 @@ services:
     restart: unless-stopped
     gpus: all
     ports:
-      - "8080:8080"
+      # Host 8090 (não 8080): a 8080 costuma estar ocupada pelo Airflow.
+      # A porta interna do container segue 8080 — só o mapeamento muda.
+      - "8090:8080"
     volumes:
       - ${WA_MODELS_DIR:-${HOME}/.ai-work-assistant/models}:/models
     command: >
@@ -36,7 +38,7 @@ services:
     restart: unless-stopped
     gpus: all
     ports:
-      - "8081:8080"
+      - "8091:8080"
     volumes:
       - ${WA_MODELS_DIR:-${HOME}/.ai-work-assistant/models}:/models
     command: >

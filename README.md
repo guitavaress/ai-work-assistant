@@ -24,7 +24,7 @@ Otimizado para rodar em notebook com GPU modesta (referência: **RTX 3050 Laptop
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-- O **servidor de inferência** roda em Docker (imagem oficial CUDA do llama.cpp) e expõe uma API OpenAI-compatible em `http://localhost:8080/v1`.
+- O **servidor de inferência** roda em Docker (imagem oficial CUDA do llama.cpp) e expõe uma API OpenAI-compatible em `http://localhost:8090/v1`.
 - A **CLI** roda nativa no Ubuntu e guarda seus dados em SQLite (`~/.ai-work-assistant/`).
 - Modelo padrão: **Qwen3.5 4B Instruct (Q4_K_M)** — ver [avaliação de modelos](docs/model-evaluation.md).
 
@@ -165,10 +165,10 @@ Variáveis de ambiente (todas opcionais):
 | Variável | Padrão | Descrição |
 |---|---|---|
 | `WA_DATA_DIR` | `~/.ai-work-assistant` | Onde ficam o SQLite e os modelos |
-| `WA_LLM_BASE_URL` | `http://localhost:8080/v1` | Endpoint do servidor llama.cpp |
+| `WA_LLM_BASE_URL` | `http://localhost:8090/v1` | Endpoint do servidor llama.cpp |
 | `WA_LLM_MODEL` | `qwen3.5-4b` | Nome do modelo padrão |
 | `WA_QUALITY_MODEL` | *(vazio)* | Modelo usado pelo `wa review`, se definido |
-| `WA_QUALITY_BASE_URL` | `http://localhost:8081/v1` | Endpoint do servidor do modo qualidade |
+| `WA_QUALITY_BASE_URL` | `http://localhost:8091/v1` | Endpoint do servidor do modo qualidade |
 | `WA_LLM_TIMEOUT` | `120` | Timeout das chamadas ao modelo (s) |
 | `WA_ENABLE_THINKING` | *(desligado)* | `1` ativa o modo thinking do Qwen nas respostas de texto do modelo padrão (mais qualidade, bem mais lento) |
 | `WA_QUALITY_ENABLE_THINKING` | `1` (ligado) | Thinking no caminho de qualidade (9B); `0` desliga. Só afeta texto livre — a saída estruturada nunca usa thinking |
