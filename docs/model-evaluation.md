@@ -65,15 +65,13 @@ Conclusões:
 
 Com 6GB o objetivo muda de "maximizar camadas na GPU" (era 4GB) para **rodar o modelo inteiro na GPU** com um quant um pouco menor — full offload é o que dá o salto de velocidade. O escolhido é **IQ4_XS** (`-ngl 99`, flash-attn + KV q8_0, c=8192):
 
-- Peso IQ4_XS ≈ 5.17 GB; overhead de KV q8_0 (c=8192) + compute ≈ 550 MiB (extrapolado do benchmark parcial abaixo) → **~5.8 GB de VRAM**, dentro dos 6144 MiB com margem apertada (~300 MiB). **Medir com `nvidia-smi` na máquina alvo** (linha a preencher após o benchmark):
+- **Medido (2026-08-01, RTX 4070):** o IQ4_XS full offload consome **4999 MiB (~5.0 GB)** de VRAM isolada — obtido subtraindo o baseline do desktop (6515 MiB com o 9B vs. 1516 MiB sem modelo). Cabe nos 6144 MiB da 3050 com **~1.1 GB de folga**, bem melhor que a estimativa inicial de ~5.8 GB.
 
-| Quant / config | VRAM (medir) | Prompt (t/s) | Geração (t/s) | Cabe nos 6144 MiB? |
+| Quant / config | VRAM | Prompt (t/s) | Geração (t/s, 4070) | Cabe nos 6144 MiB? |
 |---|---|---|---|---|
-| **IQ4_XS, `-ngl 99`, KV q8_0, c=8192 (alvo)** | ~5.8 GB (a medir) | a medir | a medir | ⚠️ margem ~300 MiB |
-| Q4_K_S, `-ngl 99` (fallback maior) | ~6.0 GB (a medir) | a medir | a medir | ❌ provavelmente não |
-| Q3_K_M, `-ngl 99` (fallback menor, se IQ4_XS não couber) | ~5.0 GB (a medir) | a medir | a medir | ✅ folga |
+| **IQ4_XS, `-ngl 99`, KV q8_0, c=8192 (adotada)** | 4999 MiB | 1297 | 80.1 | ✅ folga ~1.1 GB |
 
-Se o IQ4_XS full offload não couber com folga, os caminhos são: (a) reduzir para `c=4096` e/ou KV `q4_0`; (b) descer para um quant Q3 (full offload garantido, leve perda de qualidade). Q4_K_M com offload parcial vira o último recurso ("máxima fidelidade, mais lento").
+Na 3050 a banda de memória é ~0.4× a da 4070 → geração estimada **~30 t/s** (a medir na máquina alvo), confortável para o `wa review` com thinking. Como o IQ4_XS coube com folga, os fallbacks não foram necessários (ficam registrados para referência: `c=4096`/KV `q4_0` ou um quant Q3 se um dia faltar VRAM; Q4_K_M com offload parcial como último recurso).
 
 #### Referência histórica (era 4GB): 9B Q4_K_M com offload parcial
 
@@ -87,7 +85,7 @@ Dados medidos quando o alvo era 4GB — mantidos como referência da relação `
 | 18 | 3490 MiB | 730 | 11.0 |
 | 16 | 2812 MiB | 626 | 10.5 |
 
-Nota: a geração no offload parcial dependia da CPU (i7 13ª gen), daí ~11 t/s a `-ngl 18`. O full offload em 6GB elimina esse gargalo — espera-se geração bem acima disso (a medir), tornando o `wa review` com thinking viável.
+Nota: a geração no offload parcial dependia da CPU (i7 13ª gen), daí ~11 t/s a `-ngl 18`. O full offload em 6GB elimina esse gargalo — medimos **80.1 t/s** na 4070 (ver tabela acima), tornando o `wa review` com thinking viável.
 
 ## Fontes
 

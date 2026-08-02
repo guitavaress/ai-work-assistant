@@ -100,7 +100,7 @@ Monitore com `nvidia-smi` na primeira execução: medido em **3164 MiB** de VRAM
 
 ### Modo qualidade (opcional)
 
-Nos 6GB dá para rodar o **Qwen3.5 9B** (quant IQ4_XS) **inteiro na GPU** (`-ngl 99`) — raciocínio bem melhor que o 4B, com thinking ligado. Estima-se ~5.8GB de VRAM (validar com `nvidia-smi`; margem apertada nos 6GB) e velocidade muito acima do offload parcial anterior. O `wa review` usa este modelo quando ativado. Baixe com `python3 scripts/download_model.py --quality`, suba com `docker compose -f docker/docker-compose.yml --profile quality up -d` e aponte o assistente para ele:
+Nos 6GB dá para rodar o **Qwen3.5 9B** (quant IQ4_XS) **inteiro na GPU** (`-ngl 99`) — raciocínio bem melhor que o 4B, com thinking ligado. Medido em **~5.0GB de VRAM** (cabe nos 6GB com ~1.1GB de folga) e **~80 t/s** de geração na 4070 (estimado ~30 t/s na 3050) — muito acima do offload parcial anterior. O `wa review` usa este modelo quando ativado. Baixe com `python3 scripts/download_model.py --quality`, suba com `docker compose -f docker/docker-compose.yml --profile quality up -d` e aponte o assistente para ele:
 
 ```bash
 export WA_QUALITY_MODEL=qwen3.5-9b

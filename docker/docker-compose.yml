@@ -26,9 +26,9 @@ services:
 
   # Modo qualidade (opcional): Qwen3.5 9B IQ4_XS inteiro na GPU (full offload).
   # Sobe com: docker compose -f docker/docker-compose.yml --profile quality up -d
-  # IQ4_XS (~5.2GB) + KV q8_0 c=8192 estima ~5.8GB de VRAM — cabe nos 6144 MiB da
-  # 3050 6GB com margem apertada (~300 MiB); validar com nvidia-smi na máquina alvo.
-  # NÃO roda junto com o serviço `llm` (4B) nos 6GB: use um profile por vez.
+  # IQ4_XS + KV q8_0 c=8192 medido em ~5.0GB de VRAM (4999 MiB na 4070, 2026-08-01)
+  # — cabe nos 6144 MiB da 3050 6GB com ~1.1GB de folga. ~80 t/s de geração na 4070
+  # (estimado ~30 t/s na 3050). NÃO roda junto com o `llm` (4B) nos 6GB: um por vez.
   llm-quality:
     profiles: ["quality"]
     image: ghcr.io/ggml-org/llama.cpp:server-cuda

@@ -30,5 +30,5 @@ docker compose -f docker/docker-compose.yml up -d   # servidor LLM (precisa de G
 - Testes não podem chamar o LLM: teste `db.py` direto, os comandos via `typer.testing.CliRunner` e a API web via `fastapi.testclient.TestClient` (LLM mockado com monkeypatch em `llm.structured`/`llm.complete`). Fixture padrão: monkeypatch em `config.DB_PATH` para `tmp_path`.
 - Datas como strings ISO (`YYYY-MM-DD`) — o SQLite compara lexicograficamente.
 - Novos comandos: criar módulo em `commands/`, registrar em `cli.py` com `app.add_typer`, prompt correspondente em `prompts/`.
-- Hardware alvo: RTX 3050 Laptop 6GB VRAM. Qualquer mudança nas flags do docker-compose deve manter o uso de VRAM abaixo de ~5.7GB (o 4B padrão fica em ~3.2GB; o 9B em modo qualidade opera perto do limite, ~5.8GB — validar sempre com `nvidia-smi` na 3050).
+- Hardware alvo: RTX 3050 Laptop 6GB VRAM. Qualquer mudança nas flags do docker-compose deve manter o uso de VRAM abaixo de ~5.7GB (o 4B padrão fica em ~3.2GB; o 9B em modo qualidade foi medido em ~5.0GB, cabe com folga — validar sempre com `nvidia-smi` na 3050).
 - A escolha de modelo está documentada em `docs/model-evaluation.md` — atualizar se trocar o modelo padrão.
