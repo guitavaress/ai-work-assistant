@@ -356,3 +356,70 @@ def test_verdict_validation(conn):
         db.add_checkpoint_verdicts(
             conn, cp.id, [{"stage_id": etapa_alheia.id, "verdict": "atende"}]
         )
+
+
+# --- Ritual do dia ----------------------------------------------------------
+
+
+def test_ritual_is_empty_without_anything_due(conn):
+    db.add_project(conn, "Sem prazo", "meta")  # sem deadline: não gera item
+    assert services.day_ritual(conn, today="2026-08-10") == []
+
+
+def test_ritual_flags_overdue_current_stage_as_now(conn):
+    _janela(conn)
+    services.ensure_routines(conn, today="2026-08-03")
+    item = services.day_ritual(conn, today="2026-08-10")[0]
+    assert item["level"] == "now"
+    assert item["title"] == "Janela de Comissões — 2026-08"
+    assert "Extrair base" in item["detail"]
+    assert item["action"] == "checkpoint"
+    assert item["target"].startswith("r")
+
+
+def test_ritual_flags_cycle_past_sla_as_open(conn):
+    """Todas as etapas fechadas mas o ciclo continua aberto depois do SLA."""
+    _janela(conn)
+    services.ensure_routines(conn, today="2026-08-03")
+    ciclo = db.list_projects(conn, kind="routine_run")[0]
+    for s in db.list_stages(conn, ciclo.id):
+        db.complete_stage(conn, s.id)
+
+    item = services.day_ritual(conn, today="2026-08-10")[0]
+    assert item["level"] == "open"
+    assert item["action"] == "close"
+    assert "SLA" in item["detail"]
+
+
+def test_ritual_flags_stale_project_as_calm(conn):
+    db.add_project(conn, "Migração Glue", "meta", deadline="2026-12-01")
+    itens = services.day_ritual(conn, today="2026-08-10")
+    assert [i["level"] for i in itens] == ["calm"]
+    assert itens[0]["detail"] == "nunca teve checkpoint"
+    assert itens[0]["target"].startswith("p")
+
+
+def test_ritual_ignores_project_with_recent_checkpoint(conn):
+    p = db.add_project(conn, "Migração Glue", "meta", deadline="2026-12-01")
+    cp = db.add_checkpoint(conn, p.id, "relato", "avaliação")
+    conn.execute("UPDATE checkpoints SET created_at = ? WHERE id = ?", ("2026-08-08", cp.id))
+    conn.commit()
+    assert services.day_ritual(conn, today="2026-08-10") == []
+
+
+def test_ritual_ignores_project_without_deadline(conn):
+    """Sem prazo não há urgência a alegar — é o que impede o ritual de virar ruído."""
+    db.add_project(conn, "Exploratório", "meta")
+    assert services.day_ritual(conn, today="2026-08-10") == []
+
+
+def test_ritual_orders_by_level_and_caps_at_three(conn):
+    for n in range(5):
+        db.add_project(conn, f"Projeto {n}", "meta", deadline="2026-12-01")
+    _janela(conn)
+    services.ensure_routines(conn, today="2026-08-03")
+
+    itens = services.day_ritual(conn, today="2026-08-10")
+    assert len(itens) == services.RITUAL_LIMIT
+    assert itens[0]["level"] == "now"  # o ciclo atrasado vem antes dos projetos parados
+    assert [i["level"] for i in itens[1:]] == ["calm", "calm"]

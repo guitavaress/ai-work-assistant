@@ -512,6 +512,27 @@ def stage_progress(conn: sqlite3.Connection, stage_id: int) -> dict:
     return _task_counts(conn, "stage_id", stage_id)
 
 
+def stage_progress_map(conn: sqlite3.Connection, project_id: int) -> dict[int, dict]:
+    """Progresso de todas as etapas do projeto num único GROUP BY.
+
+    `stage_progress` é uma query por etapa; montar a tela inteira com ela daria
+    dezenas de consultas por request.
+    """
+    rows = conn.execute(
+        "SELECT s.id AS stage_id, COUNT(t.id) AS total,"
+        " COALESCE(SUM(t.status = 'done'), 0) AS done"
+        " FROM stages s LEFT JOIN tasks t ON t.stage_id = s.id"
+        " WHERE s.project_id = ? GROUP BY s.id",
+        (project_id,),
+    )
+    return {row["stage_id"]: {"total": row["total"], "done": row["done"]} for row in rows}
+
+
+def stage_names(conn: sqlite3.Connection) -> dict[int, str]:
+    """Nome de toda etapa, para resolver o rótulo da tarefa sem N+1."""
+    return {row["id"]: row["name"] for row in conn.execute("SELECT id, name FROM stages")}
+
+
 def list_known_tags(conn: sqlite3.Connection) -> list[str]:
     """Tags distintas já usadas, em ordem alfabética."""
     known: set[str] = set()

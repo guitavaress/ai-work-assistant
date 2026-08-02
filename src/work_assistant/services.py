@@ -188,6 +188,83 @@ def close_routine_run(
     return db.complete_project(conn, project.id, closed_on=closed_on)
 
 
+RITUAL_LIMIT = 3
+RITUAL_STALE_CHECKPOINT_DAYS = 7
+# Níveis batem com as classes .ritual-now / .ritual-open / .ritual-calm do design.
+_RITUAL_ORDER = {"now": 0, "open": 1, "calm": 2}
+
+
+def day_ritual(conn: sqlite3.Connection, today: str | None = None) -> list[dict]:
+    """O que o dia exige, no máximo 3 itens, do mais urgente ao menos.
+
+    `now`  — etapa corrente vencida num ciclo aberto (o que trava o SLA agora).
+    `open` — ciclo que passou do SLA e nunca foi fechado.
+    `calm` — projeto com prazo e sem checkpoint recente.
+    """
+    today = today or db.today()
+    items: list[dict] = []
+
+    for run in db.list_projects(conn, kind="routine_run"):
+        stages = db.list_stages(conn, run.id)
+        current = next((s for s in stages if s.status != "done"), None)
+        if current and current.deadline and current.deadline < today:
+            items.append(
+                {
+                    "level": "now",
+                    "title": run.name,
+                    "detail": f"{current.name} venceu em {current.deadline}",
+                    "action": "checkpoint",
+                    "target": f"r{run.id}",
+                    "project_id": run.id,
+                    "overdue": _days(current.deadline, today),
+                }
+            )
+        elif run.deadline and run.deadline < today:
+            items.append(
+                {
+                    "level": "open",
+                    "title": run.name,
+                    "detail": f"passou do SLA em {run.deadline} e continua aberto",
+                    "action": "close",
+                    "target": f"r{run.id}",
+                    "project_id": run.id,
+                    "overdue": _days(run.deadline, today),
+                }
+            )
+
+    stale = _shift(today, -RITUAL_STALE_CHECKPOINT_DAYS)
+    for project in db.list_projects(conn):
+        # Sem prazo não há urgência a alegar — é o que impede o ritual de virar ruído.
+        if not project.deadline:
+            continue
+        checkpoints = db.list_checkpoints(conn, project.id)
+        last = checkpoints[-1].created_at[:10] if checkpoints else None
+        if last is None or last < stale:
+            desde = f"último checkpoint em {last}" if last else "nunca teve checkpoint"
+            items.append(
+                {
+                    "level": "calm",
+                    "title": project.name,
+                    "detail": desde,
+                    "action": "checkpoint",
+                    "target": f"p{project.id}",
+                    "project_id": project.id,
+                    "overdue": 0,
+                }
+            )
+
+    items.sort(key=lambda i: (_RITUAL_ORDER[i["level"]], -i["overdue"], i["project_id"]))
+    return items[:RITUAL_LIMIT]
+
+
+def _days(start: str, end: str) -> int:
+    return (date.fromisoformat(end) - date.fromisoformat(start)).days
+
+
+def _shift(day: str, delta: int) -> str:
+    return (date.fromisoformat(day) + timedelta(days=delta)).isoformat()
+
+
 def routine_view(conn: sqlite3.Connection, routine: db.Routine) -> dict:
     """Rotina + checklist + ciclos com progresso + próxima abertura (para `wa routine show`)."""
     runs = []
