@@ -212,6 +212,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .split-legend .run { color: var(--cycle); }
 .split-legend .change { color: var(--accent); }
 .split-note { font-size: 13.5px; color: var(--dim); margin-top: 14px; line-height: 1.5; max-width: 640px; }
+.navcount { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; color: var(--cycle); background: var(--cycle-soft); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+.sect-title { font-family: var(--font-mono); font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.6px; }
 
 /* Projetos view */
 .stackv { display: flex; flex-direction: column; gap: 22px; }
@@ -332,6 +334,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   <div class="container">
     <div class="view" id="view-hoje"></div>
     <div class="view" id="view-projetos"></div>
+    <div class="view" id="view-rotinas"></div>
     <div class="view" id="view-chat"></div>
     <div class="view" id="view-rev"></div>
     <div class="view" id="view-hist"></div>
@@ -356,6 +359,7 @@ const S = {
   cp: { stage: 'pick', projectId: null, text: '', blocks: [], status: '', name: '', goal: '' },
   np: { open: false, name: '', goal: '' },
   openStages: {},
+  routines: [], ritual: [], counts: {},
   edit: { id: null, project_id: '', tags: '', due: '', effort: '' },
 };
 const OFFLINE_MSG = 'Servidor offline — suba o llama.cpp com docker compose up -d';
@@ -428,6 +432,9 @@ async function loadState() {
   S.tasks = st.tasks;
   S.projects = st.projects;
   S.routine_runs = st.routine_runs || [];
+  S.routines = st.routines || [];
+  S.ritual = st.ritual || [];
+  S.counts = st.counts || {};
   if (!S.viewDay) S.viewDay = st.today;
   if (!S.histDay) S.histDay = st.today;
   render();
@@ -463,11 +470,12 @@ function render() {
   renderServer();
   renderDaynav();
   renderFab();
-  for (const v of ['hoje', 'projetos', 'chat', 'rev', 'hist']) {
+  for (const v of ['hoje', 'projetos', 'rotinas', 'chat', 'rev', 'hist']) {
     document.getElementById('view-' + v).classList.toggle('active', S.view === v);
   }
   if (S.view === 'hoje') renderHoje();
   if (S.view === 'projetos') renderProjetos();
+  if (S.view === 'rotinas') renderRotinas();
   if (S.view === 'chat') renderChat();
   if (S.view === 'rev') renderRev();
   if (S.view === 'hist') renderHist();
@@ -481,10 +489,14 @@ function go(view) {
   render();
 }
 function renderNav() {
-  const items = [['Hoje', 'hoje'], ['Projetos', 'projetos'], ['Análise', 'rev'], ['Chat', 'chat'], ['Histórico', 'hist']];
-  document.getElementById('nav').innerHTML = items.map(([label, key]) =>
-    '<button class="' + (S.view === key ? 'active' : '') + '" onclick="go(\'' + key + '\')">' + label + '</button>'
-  ).join('');
+  const items = [['Hoje', 'hoje'], ['Projetos', 'projetos'], ['Rotinas', 'rotinas'],
+                 ['Análise', 'rev'], ['Chat', 'chat'], ['Histórico', 'hist']];
+  document.getElementById('nav').innerHTML = items.map(([label, key]) => {
+    // Só Rotinas tem contador, e é a contagem de ciclos abertos.
+    const n = key === 'rotinas' ? (S.counts.rotinas || 0) : 0;
+    return '<button class="' + (S.view === key ? 'active' : '') + '" onclick="go(\'' + key + '\')">'
+      + label + (n ? '<span class="navcount">' + n + '</span>' : '') + '</button>';
+  }).join('');
 }
 function renderServer() {
   document.getElementById('server').classList.toggle('off', !S.online);
@@ -666,6 +678,20 @@ function renderHoje() {
 
   // Coluna direita: sidebar
   html += '<div class="col">';
+  const ciclos = S.routine_runs.filter(c => c.open);
+  if (ciclos.length) {
+    html += '<div class="scard" style="background:var(--cycle-soft); border-color:var(--cycle-border);">'
+      + '<div class="scard-head"><div class="scard-title" style="color:var(--cycle-text);">⟳ Ciclos abertos</div>'
+      + '<button class="btn-link" style="color:var(--cycle);" onclick="go(\'rotinas\')">ver todos</button></div>'
+      + ciclos.map(c => {
+        const sla = slaLabel(c);
+        return '<div class="pmini"><div class="pmini-head">'
+          + '<span class="pmini-name"><span class="txt">' + esc(c.routine_name || c.name) + '</span></span>'
+          + '<span class="sla' + sla.cls + '" style="font-size:11px;">' + esc(sla.txt) + '</span></div>'
+          + stageSegments(c) + stageLine(c) + '</div>';
+      }).join('')
+      + '</div>';
+  }
   html += '<div class="scard"><div class="scard-head"><div class="scard-title">Projetos</div>'
     + '<button class="btn-link" onclick="go(\'projetos\')">ver todos</button></div>'
     + (active.length ? active.map(projMini).join('')
@@ -735,6 +761,90 @@ function renderProjetos() {
   }
   html += '</div>';
   document.getElementById('view-projetos').innerHTML = html;
+}
+
+function slaLabel(c) {
+  if (!c.open) return { txt: 'fechado', cls: '' };
+  const left = c.sla_left_days;
+  if (left === null || left === undefined) return { txt: 'sem prazo', cls: '' };
+  if (left < 0) return { txt: 'SLA estourado há ' + (-left) + (left === -1 ? ' dia' : ' dias'), cls: ' warn' };
+  if (left === 0) return { txt: 'SLA vence hoje', cls: ' warn' };
+  if (left <= 2) return { txt: 'SLA em ' + left + (left === 1 ? ' dia' : ' dias'), cls: ' soon' };
+  return { txt: 'SLA em ' + left + ' dias', cls: '' };
+}
+
+function cycleCard(c) {
+  const sla = slaLabel(c);
+  let html = '<div class="ccard' + (c.open ? '' : ' done') + '">'
+    + '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">'
+    + '<div style="min-width:0;">'
+    + '<div class="ckicker"><span>⟳</span>' + esc(c.period_label || '') + (c.cadence ? ' · ' + esc(c.cadence) : '') + '</div>'
+    + '<div class="cname">' + esc(c.routine_name || c.name) + '</div>'
+    + '<div class="cgoal">' + esc(c.goal) + '</div></div>'
+    + '<span class="' + statusCls(c.tag) + '" style="padding:3px 8px;">' + esc(c.tag) + '</span></div>'
+    + '<div class="cmeta"><span>janela ' + esc(c.window_label || '—') + '</span>'
+    + '<span class="sla' + sla.cls + '">' + esc(sla.txt) + '</span>'
+    + '<span>' + c.tasks.done + '/' + c.tasks.total + ' tarefas</span></div>'
+    + stageSegments(c)
+    + stageLine(c)
+    + currentCriteria(c)
+    + stageToggle(c);
+  if (c.open) {
+    html += '<div class="pcard-actions">'
+      + '<button class="btn" onclick="openCheckpointFor(' + c.id + ')">Fazer checkpoint</button>'
+      + '<button class="btn-plain" onclick="closeCycle(' + c.id + ')">Fechar ciclo</button></div>';
+  }
+  return html + '</div>';
+}
+
+function renderRotinas() {
+  const abertos = S.routine_runs.filter(c => c.open);
+  const fechados = S.routine_runs.filter(c => !c.open).slice().reverse();
+  let html = '<div class="stackv">';
+  html += '<div><div class="kicker" style="color:var(--cycle);">'
+    + '⟳ trabalho que volta · fecha um ciclo e recomeça</div>'
+    + '<div class="h-lg">Rotinas</div></div>';
+
+  if (!S.routines.length) {
+    html += '<div class="empty">Nenhuma rotina cadastrada. Crie com <span class="mono">wa routine add</span> '
+      + 'e monte o checklist com <span class="mono">wa routine steps</span>.</div>';
+  }
+
+  if (abertos.length) {
+    html += '<div class="sect-title">ciclos abertos</div>';
+    html += abertos.map(cycleCard).join('');
+  }
+  if (fechados.length) {
+    html += '<div class="sect-title">ciclos fechados</div>';
+    html += fechados.map(c => {
+      const sla = c.closed_on_time === null ? 'sem data de fechamento'
+        : (c.closed_on_time ? 'fechado no SLA' : 'fechado com atraso');
+      const cls = c.closed_on_time === null ? 'sbadge' : (c.closed_on_time ? 'sbadge ok' : 'sbadge risk');
+      return '<div class="ccard done" style="display:flex; align-items:center; gap:12px; padding:16px 22px;">'
+        + '<span class="mono" style="color:var(--faint);">⟳</span>'
+        + '<div style="flex:1; min-width:0;">'
+        + '<div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">'
+        + '<span style="font-size:14.5px; font-weight:600;">' + esc(c.routine_name || c.name) + '</span>'
+        + '<span class="pmini-prog">' + esc(c.period_label || '') + '</span></div>'
+        + '<div class="pmini-prog" style="margin-top:3px;">'
+        + c.stages_progress.done + '/' + c.stages_progress.total + ' etapas'
+        + (c.done_at ? ' · fechado em ' + fmtShort(c.done_at.slice(0, 10)) : '') + '</div></div>'
+        + '<span class="' + cls + '">' + sla + '</span></div>';
+    }).join('');
+  }
+  html += '</div>';
+  document.getElementById('view-rotinas').innerHTML = html;
+}
+
+async function closeCycle(id) {
+  const c = S.routine_runs.find(x => x.id === id);
+  const pend = c ? c.stages_progress.total - c.stages_progress.done : 0;
+  const aviso = pend ? '\n\n' + pend + ' etapa(s) ainda pendente(s).' : '';
+  if (!confirm('Fechar o ciclo ' + (c ? c.name : '') + '?' + aviso)) return;
+  await api('/api/projects/' + id + '/done', { method: 'POST' });
+  S.review.metrics = null;  // o SLA do ciclo entra na Análise
+  await loadState();
+  toast('Ciclo fechado.');
 }
 
 function renderChat() {
@@ -1005,31 +1115,43 @@ async function savePlan() {
 }
 
 // --- Modal: checkpoint -----------------------------------------------------
+// Checkpoint vale para projeto e para ciclo de rotina — os dois são frentes
+// avaliáveis, e o backend trata ciclo como uma linha de projects.
+function cpTargets() {
+  return S.projects.filter(p => p.active).concat(S.routine_runs.filter(c => c.open));
+}
+function findTarget(id) {
+  return cpTargets().find(x => x.id === id)
+    || S.projects.concat(S.routine_runs).find(x => x.id === id);
+}
+function cpState(x) {
+  return {
+    stage: 'input', projectId: x.id, name: x.name, goal: x.goal,
+    isCycle: x.kind === 'routine_run', stages: x.stages || [],
+    text: '', blocks: [], status: '', verdicts: [],
+  };
+}
 function openCheckpoint() {
   if (!guardLLM()) return;
-  const active = S.projects.filter(p => p.active);
-  if (!active.length) { toast('Cadastre um projeto antes de fazer checkpoint.'); return; }
+  const alvos = cpTargets();
+  if (!alvos.length) { toast('Cadastre um projeto ou rotina antes de fazer checkpoint.'); return; }
   S.modal = 'checkpoint';
-  if (active.length === 1) {
-    S.cp = { stage: 'input', projectId: active[0].id, name: active[0].name, goal: active[0].goal, text: '', blocks: [], status: '' };
-  } else {
-    S.cp = { stage: 'pick', projectId: null, name: '', goal: '', text: '', blocks: [], status: '' };
-  }
+  S.cp = alvos.length === 1 ? cpState(alvos[0])
+    : { stage: 'pick', projectId: null, name: '', goal: '', text: '', blocks: [], status: '', verdicts: [], stages: [] };
   render();
 }
 function openCheckpointFor(id) {
   if (!guardLLM()) return;
-  const p = S.projects.find(p => p.id === id);
+  const x = findTarget(id);
+  if (!x) { toast('Frente não encontrada.'); return; }
   S.modal = 'checkpoint';
-  S.cp = { stage: 'input', projectId: p.id, name: p.name, goal: p.goal, text: '', blocks: [], status: '' };
+  S.cp = cpState(x);
   render();
 }
 function pickCp(id) {
-  const p = S.projects.find(p => p.id === id);
-  S.cp.stage = 'input';
-  S.cp.projectId = p.id;
-  S.cp.name = p.name;
-  S.cp.goal = p.goal;
+  const x = findTarget(id);
+  if (!x) return;
+  S.cp = cpState(x);
   render();
 }
 async function runCp() {
@@ -1041,6 +1163,7 @@ async function runCp() {
     const r = await api('/api/checkpoint', { project_id: S.cp.projectId, progress: S.cp.text });
     S.cp.blocks = r.blocks;
     S.cp.status = r.status || '';
+    S.cp.verdicts = r.verdicts || [];
     S.cp.stage = 'result';
     render();
     loadState();
@@ -1101,25 +1224,45 @@ function renderModal() {
       + '<button class="btn-primary" onclick="saveTaskEdit()">Salvar</button></div>';
   } else if (S.modal === 'checkpoint') {
     if (S.cp.stage === 'pick') {
-      const active = S.projects.filter(p => p.active);
       inner = '<div class="modal-title">Checkpoint</div>'
-        + '<div class="modal-sub">De qual projeto?</div>'
-        + '<div class="pick-list">' + active.map(p =>
-          '<button onclick="pickCp(' + p.id + ')"><span class="p-name">' + esc(p.name) + '</span>'
-          + '<span class="p-goal">' + esc(p.goal) + '</span></button>').join('') + '</div>'
+        + '<div class="modal-sub">De qual frente?</div>'
+        + '<div class="pick-list">' + cpTargets().map(x =>
+          '<button onclick="pickCp(' + x.id + ')"><span class="p-name">'
+          + (x.kind === 'routine_run' ? '⟳ ' : '') + esc(x.name) + '</span>'
+          + '<span class="p-goal">' + esc(x.goal) + '</span></button>').join('') + '</div>'
         + '<div class="modal-actions"><button class="btn-plain" onclick="closeModal()">Cancelar</button></div>';
     } else if (S.cp.stage === 'input') {
-      inner = '<div class="modal-title">Checkpoint — ' + esc(S.cp.name) + '</div>'
+      // Os critérios de pronto vêm ANTES do campo de texto: é contra eles que o
+      // modelo vai julgar, então o usuário relata sabendo o que precisa provar.
+      const stages = S.cp.stages || [];
+      inner = '<div class="modal-title">Checkpoint — ' + (S.cp.isCycle ? '⟳ ' : '') + esc(S.cp.name) + '</div>'
         + '<div class="modal-sub" style="font-size:13.5px;">Objetivo: ' + esc(S.cp.goal) + '</div>'
+        + (stages.length ? '<div style="margin:14px 0; border:1px solid var(--line); border-radius:10px;">'
+            + stages.map(st => '<div class="strow' + (st.is_current ? ' strow-cur' : '') + '">'
+              + '<span class="stbox' + (st.done ? ' done' : (st.overdue ? ' late' : '')) + '">' + (st.done ? '✓' : '') + '</span>'
+              + '<div style="flex:1; min-width:0;">'
+              + '<span class="stname' + (st.done ? ' done' : '') + '">' + esc(st.name) + '</span>'
+              + (st.done_criteria ? '<div class="scrit" style="margin-top:4px;"><span class="scrit-kick">pronto quando</span>' + esc(st.done_criteria) + '</div>' : '')
+              + '</div></div>').join('')
+            + '</div>' : '')
         + '<textarea id="cp-text" rows="5" placeholder="Como está o progresso? (o que avançou, o que travou, o que falta)">' + esc(S.cp.text) + '</textarea>'
         + '<div class="modal-actions"><button class="btn-plain" onclick="closeModal()">Cancelar</button>'
         + '<button class="btn-primary" onclick="runCp()">Avaliar progresso</button></div>';
     } else if (S.cp.stage === 'thinking') {
       inner = '<div class="wait"><span class="spinner lg"></span><span>Avaliando progresso…</span></div>';
     } else {
-      inner = '<div style="display:flex; align-items:center; gap:12px;">'
+      const vs = S.cp.verdicts || [];
+      inner = '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">'
         + '<div class="modal-title">Avaliação — ' + esc(S.cp.name) + '</div>'
         + (S.cp.status ? '<span class="' + statusCls(S.cp.status) + '">' + esc(S.cp.status) + '</span>' : '') + '</div>'
+        + (vs.length ? '<div style="margin-top:16px; display:flex; flex-direction:column; gap:10px;">'
+            + vs.map(v => '<div style="border:1px solid var(--line); border-radius:10px; padding:12px 14px;">'
+              + '<div style="display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;">'
+              + '<span class="verdict ' + (v.verdict === 'atende' ? 'ok' : (v.verdict === 'nao_atende' ? 'no' : '')) + '">' + esc(v.label) + '</span>'
+              + '<span style="font-size:14px; font-weight:600;">' + esc(v.stage_name) + '</span></div>'
+              + (v.rationale ? '<div class="verdict-why">' + esc(v.rationale) + '</div>' : '')
+              + '</div>').join('')
+            + '</div>' : '')
         + '<div class="blocks">' + S.cp.blocks.map(b =>
           '<div><div class="block-title">' + esc(b.title) + '</div>'
           + '<div class="block-body">' + esc(b.body) + '</div></div>').join('') + '</div>'
