@@ -256,6 +256,7 @@ def test_checkpoint_saves_status_and_summary(client, conn, monkeypatch):
             "situacao": "Avançando bem.",
             "riscos": "Testes adiados.",
             "proximo_passo": ["Fechar auth", "Escrever testes"],
+            "vereditos": [],
             "status": "no rumo",
             "resumo": "No rumo — falta auth.",
         },

@@ -49,8 +49,23 @@ CHECKPOINT_SCHEMA = {
         "proximo_passo": {"type": "array", "items": {"type": "string"}},
         "status": {"type": "string", "enum": CHECKPOINT_STATUSES},
         "resumo": {"type": "string"},
+        # O modelo identifica a etapa pelo NOME (que ele recebe no contexto), nunca
+        # por id: pedir id a um LLM é convite para alucinação com chave estrangeira.
+        "vereditos": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "etapa": {"type": "string"},
+                    "veredito": {"type": "string", "enum": list(db.VERDICT_VALUES)},
+                    "justificativa": {"type": "string"},
+                },
+                "required": ["etapa", "veredito", "justificativa"],
+                "additionalProperties": False,
+            },
+        },
     },
-    "required": ["situacao", "riscos", "proximo_passo", "status", "resumo"],
+    "required": ["situacao", "riscos", "proximo_passo", "status", "resumo", "vereditos"],
     "additionalProperties": False,
 }
 
@@ -166,9 +181,11 @@ def ensure_routines(
     return created
 
 
-def close_routine_run(conn: sqlite3.Connection, project: db.Project) -> db.Project:
+def close_routine_run(
+    conn: sqlite3.Connection, project: db.Project, closed_on: str | None = None
+) -> db.Project:
     """Fecha o ciclo. Sempre manual: ver a janela do mês passado aberta é o sinal."""
-    return db.complete_project(conn, project.id)
+    return db.complete_project(conn, project.id, closed_on=closed_on)
 
 
 def routine_view(conn: sqlite3.Connection, routine: db.Routine) -> dict:
@@ -232,7 +249,7 @@ def run_checkpoint(
         f"**Riscos e desvios**: {result['riscos']}\n\n"
         f"**Próximo passo**:\n{steps}"
     )
-    db.add_checkpoint(
+    checkpoint = db.add_checkpoint(
         conn,
         project.id,
         progress,
@@ -241,6 +258,7 @@ def run_checkpoint(
         summary=result["resumo"],
         stage_id=stage.id if stage else None,
     )
+    verdicts = _save_verdicts(conn, project, checkpoint, result.get("vereditos") or [])
     return {
         "blocks": [
             {"title": "Situação", "body": result["situacao"]},
@@ -250,7 +268,51 @@ def run_checkpoint(
         "markdown": markdown,
         "status": result["status"],
         "summary": result["resumo"],
+        "verdicts": verdicts,
     }
+
+
+def _save_verdicts(
+    conn: sqlite3.Connection,
+    project: db.Project,
+    checkpoint: db.Checkpoint,
+    raw: list[dict],
+) -> list[dict]:
+    """Casa os vereditos do modelo (que vêm por nome) com as etapas reais.
+
+    Nome que não casa é descartado — alucinação não vira linha no banco. Etapa que
+    o modelo omitiu entra como `nao_avaliada`, para o histórico ficar completo.
+    """
+    stages = db.list_stages(conn, project.id)
+    if not stages:
+        return []
+    by_name = {s.name.strip().lower(): s for s in stages}
+    matched: dict[int, dict] = {}
+    for item in raw:
+        stage = by_name.get(str(item.get("etapa", "")).strip().lower())
+        if stage is None:
+            continue
+        matched[stage.id] = {
+            "stage_id": stage.id,
+            "verdict": item.get("veredito", "nao_avaliada"),
+            "rationale": item.get("justificativa"),
+        }
+    rows = [
+        matched.get(s.id, {"stage_id": s.id, "verdict": "nao_avaliada", "rationale": None})
+        for s in stages
+    ]
+    db.add_checkpoint_verdicts(conn, checkpoint.id, rows)
+    names = {s.id: s.name for s in stages}
+    return [
+        {
+            "stage_id": r["stage_id"],
+            "stage_name": names[r["stage_id"]],
+            "verdict": r["verdict"],
+            "label": db.VERDICT_LABELS[r["verdict"]],
+            "rationale": r["rationale"],
+        }
+        for r in rows
+    ]
 
 
 # --- Review -----------------------------------------------------------------

@@ -285,6 +285,7 @@ def test_migration_adds_stage_and_routine_columns(tmp_path):
     assert projeto.kind == "project"  # o DEFAULT preenche as linhas que já existiam
     assert projeto.routine_id is None
     assert projeto.period is None
+    assert projeto.done_at is None
 
     # Os índices só podem ser criados depois do ALTER TABLE (ver INDEXES em db.py).
     indexes = {row["name"] for row in conn.execute("PRAGMA index_list(projects)")}
@@ -512,3 +513,40 @@ def test_duplicate_routine_run_violates_the_unique_index(conn):
     db.add_routine_run(conn, r.id, "2026-08", "Janela — 2026-08", "meta")
     with pytest.raises(sqlite3.IntegrityError):
         db.add_routine_run(conn, r.id, "2026-08", "Janela — 2026-08 (bis)", "meta")
+
+
+# --- Fechamento de projetos e ciclos ----------------------------------------
+
+
+def test_complete_project_records_done_at(conn):
+    p = db.add_project(conn, "Janela", "meta")
+    feito = db.complete_project(conn, p.id)
+    assert feito.status == "done"
+    assert feito.done_at is not None
+    assert feito.done_at[:10] == db.today()
+
+
+def test_complete_project_with_explicit_date(conn):
+    """Fechamento retroativo: conserta à mão um ciclo fechado fora do app."""
+    p = db.add_project(conn, "Janela", "meta")
+    feito = db.complete_project(conn, p.id, closed_on="2026-07-03")
+    assert feito.done_at.startswith("2026-07-03")
+    with pytest.raises(ValueError, match="data de fechamento"):
+        db.complete_project(conn, p.id, closed_on="julho")
+
+
+def test_reopen_project_clears_done_at(conn):
+    p = db.add_project(conn, "Janela", "meta")
+    db.complete_project(conn, p.id)
+    reaberto = db.reopen_project(conn, p.id)
+    assert reaberto.status == "active"
+    assert reaberto.done_at is None
+    assert db.list_projects(conn) == [reaberto]
+
+
+def test_old_closed_project_keeps_done_at_null(conn):
+    """Ciclo fechado antes da migração não ganha data inventada."""
+    p = db.add_project(conn, "Antigo", "meta")
+    conn.execute("UPDATE projects SET status = 'done' WHERE id = ?", (p.id,))
+    conn.commit()
+    assert db.get_project(conn, p.id).done_at is None

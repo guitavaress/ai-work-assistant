@@ -197,6 +197,10 @@ def test_run_checkpoint_sends_stages_and_saves_the_link(conn, monkeypatch):
             "situacao": "Reconciliação parada.",
             "riscos": "Critério de diferença não foi verificado.",
             "proximo_passo": ["Rodar o batimento"],
+            "vereditos": [
+                {"etapa": "Reconciliar", "veredito": "nao_atende",
+                 "justificativa": "batimento não foi rodado"}
+            ],
             "status": "em risco",
             "resumo": "Em risco — reconciliação sem batimento.",
         }
@@ -223,6 +227,7 @@ def test_run_checkpoint_without_stage_still_works(conn, monkeypatch):
             "situacao": "ok",
             "riscos": "nenhum",
             "proximo_passo": ["seguir"],
+            "vereditos": [],
             "status": "no rumo",
             "resumo": "No rumo.",
         },
@@ -230,3 +235,124 @@ def test_run_checkpoint_without_stage_still_works(conn, monkeypatch):
     p = db.add_project(conn, "Janela", "fechar comissões")
     services.run_checkpoint(conn, p, "tudo certo")
     assert db.list_checkpoints(conn, p.id)[0].stage_id is None
+
+
+# --- Vereditos por etapa ----------------------------------------------------
+
+
+def _mock_verdicts(monkeypatch, vereditos):
+    from work_assistant import llm
+
+    monkeypatch.setattr(
+        llm,
+        "structured",
+        lambda *a, **k: {
+            "situacao": "ok",
+            "riscos": "nenhum",
+            "proximo_passo": ["seguir"],
+            "status": "no rumo",
+            "resumo": "No rumo.",
+            "vereditos": vereditos,
+        },
+    )
+
+
+def _projeto_com_etapas(conn):
+    p = db.add_project(conn, "Janela", "fechar comissões")
+    db.add_stage(conn, p.id, "Extrair base", done_criteria="arquivo na landing")
+    db.add_stage(conn, p.id, "Reconciliar", done_criteria="diferença < 0,01%")
+    return p
+
+
+def test_verdicts_matched_by_name_case_insensitive(conn, monkeypatch):
+    p = _projeto_com_etapas(conn)
+    _mock_verdicts(monkeypatch, [
+        {"etapa": "  extrair BASE ", "veredito": "atende", "justificativa": "arquivo chegou"},
+        {"etapa": "Reconciliar", "veredito": "nao_atende", "justificativa": "sem batimento"},
+    ])
+    result = services.run_checkpoint(conn, p, "relato")
+    assert [(v["stage_name"], v["verdict"]) for v in result["verdicts"]] == [
+        ("Extrair base", "atende"),
+        ("Reconciliar", "nao_atende"),
+    ]
+    assert result["verdicts"][1]["label"] == "não atende"
+
+    cp = db.list_checkpoints(conn, p.id)[0]
+    gravados = db.list_checkpoint_verdicts(conn, cp.id)
+    assert [(v.stage_id, v.verdict) for v in gravados] == [(1, "atende"), (2, "nao_atende")]
+
+
+def test_hallucinated_stage_name_is_discarded(conn, monkeypatch):
+    """Nome que não casa com etapa nenhuma não pode virar linha no banco."""
+    p = _projeto_com_etapas(conn)
+    _mock_verdicts(monkeypatch, [
+        {"etapa": "Etapa que não existe", "veredito": "atende", "justificativa": "x"},
+    ])
+    result = services.run_checkpoint(conn, p, "relato")
+    assert all(v["verdict"] == "nao_avaliada" for v in result["verdicts"])
+    assert len(result["verdicts"]) == 2
+
+
+def test_omitted_stage_becomes_nao_avaliada(conn, monkeypatch):
+    p = _projeto_com_etapas(conn)
+    _mock_verdicts(monkeypatch, [
+        {"etapa": "Extrair base", "veredito": "atende", "justificativa": "ok"},
+    ])
+    result = services.run_checkpoint(conn, p, "relato")
+    assert [(v["stage_name"], v["verdict"]) for v in result["verdicts"]] == [
+        ("Extrair base", "atende"),
+        ("Reconciliar", "nao_avaliada"),
+    ]
+
+
+def test_project_without_stages_saves_no_verdicts(conn, monkeypatch):
+    p = db.add_project(conn, "Sem etapas", "meta")
+    _mock_verdicts(monkeypatch, [])
+    result = services.run_checkpoint(conn, p, "relato")
+    assert result["verdicts"] == []
+    cp = db.list_checkpoints(conn, p.id)[0]
+    assert db.list_checkpoint_verdicts(conn, cp.id) == []
+
+
+def test_missing_vereditos_key_does_not_break(conn, monkeypatch):
+    """Mock/modelo antigo sem a chave: o checkpoint tem que salvar mesmo assim."""
+    from work_assistant import llm
+
+    p = _projeto_com_etapas(conn)
+    monkeypatch.setattr(llm, "structured", lambda *a, **k: {
+        "situacao": "ok", "riscos": "nenhum", "proximo_passo": ["seguir"],
+        "status": "no rumo", "resumo": "No rumo.",
+    })
+    result = services.run_checkpoint(conn, p, "relato")
+    assert all(v["verdict"] == "nao_avaliada" for v in result["verdicts"])
+    assert len(db.list_checkpoints(conn, p.id)) == 1
+
+
+def test_last_stage_verdicts_keeps_the_most_recent(conn, monkeypatch):
+    p = _projeto_com_etapas(conn)
+    _mock_verdicts(monkeypatch, [
+        {"etapa": "Reconciliar", "veredito": "nao_atende", "justificativa": "primeiro"},
+    ])
+    services.run_checkpoint(conn, p, "relato 1")
+    _mock_verdicts(monkeypatch, [
+        {"etapa": "Reconciliar", "veredito": "atende", "justificativa": "segundo"},
+    ])
+    services.run_checkpoint(conn, p, "relato 2")
+
+    ultimos = db.last_stage_verdicts(conn, p.id)
+    assert ultimos[2].verdict == "atende"
+    assert ultimos[2].rationale == "segundo"
+
+
+def test_verdict_validation(conn):
+    p = _projeto_com_etapas(conn)
+    cp = db.add_checkpoint(conn, p.id, "relato", "avaliação")
+    with pytest.raises(ValueError, match="Veredito inválido"):
+        db.add_checkpoint_verdicts(conn, cp.id, [{"stage_id": 1, "verdict": "talvez"}])
+
+    outro = db.add_project(conn, "Outro", "meta")
+    etapa_alheia = db.add_stage(conn, outro.id, "De outro projeto")
+    with pytest.raises(ValueError, match="não pertence"):
+        db.add_checkpoint_verdicts(
+            conn, cp.id, [{"stage_id": etapa_alheia.id, "verdict": "atende"}]
+        )
