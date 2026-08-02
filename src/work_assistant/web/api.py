@@ -63,6 +63,7 @@ class TaskProjectIn(BaseModel):
 
 class TaskEditIn(BaseModel):
     project_id: int | None = None
+    stage_id: int | None = None
     tags: list[str] = []
     due_date: str | None = None
     effort: str | None = None
@@ -364,11 +365,21 @@ def set_task_project(task_id: int, body: TaskProjectIn):
 
 @app.post("/api/tasks/{task_id}")
 def edit_task(task_id: int, body: TaskEditIn):
-    """Atualiza projeto, tags, prazo e esforço de uma tarefa (popover de edição da web)."""
+    """Atualiza projeto, etapa, tags, prazo e esforço (popover de edição da web)."""
     conn = db.connect()
     try:
         db.get_task(conn, task_id)
+        if body.stage_id is not None and body.project_id is not None:
+            # Sem esta guarda `set_task_stage` moveria a tarefa para o projeto da
+            # etapa em silêncio, contrariando o destino que o usuário escolheu.
+            if db.get_stage(conn, body.stage_id).project_id != body.project_id:
+                raise HTTPException(
+                    status_code=422, detail="Etapa não pertence ao projeto escolhido."
+                )
+        # Ordem importa: o projeto primeiro (solta a etapa se mudou de destino),
+        # a etapa depois (ela manda e reafirma o project_id).
         db.set_task_project(conn, task_id, body.project_id)
+        db.set_task_stage(conn, task_id, body.stage_id)
         db.set_task_tags(conn, task_id, body.tags)
         db.set_task_due(conn, task_id, body.due_date or None)
         task = db.set_task_effort(conn, task_id, body.effort or None)

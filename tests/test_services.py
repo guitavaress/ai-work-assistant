@@ -423,3 +423,97 @@ def test_ritual_orders_by_level_and_caps_at_three(conn):
     assert len(itens) == services.RITUAL_LIMIT
     assert itens[0]["level"] == "now"  # o ciclo atrasado vem antes dos projetos parados
     assert [i["level"] for i in itens[1:]] == ["calm", "calm"]
+
+
+# --- run x change -----------------------------------------------------------
+
+
+def _ciclo_de_hoje(conn):
+    """Materializa um ciclo com prazo em torno de hoje, sem fixar datas."""
+    from datetime import date
+
+    from work_assistant import schedule
+
+    hoje = date.fromisoformat(db.today())
+    routine = db.add_routine(conn, "Janela", "meta", "daily", 0, sla_days=0)
+    db.replace_routine_steps(conn, routine.id, [{"name": "Extrair", "offset_days": 0}])
+    return services.materialize_run(conn, routine, schedule.period_key("daily", hoje))
+
+
+def test_run_change_splits_by_project_kind(conn):
+    ciclo = _ciclo_de_hoje(conn)
+    projeto = db.add_project(conn, "Migração Glue", "meta")
+    for _ in range(3):
+        db.add_task(conn, "rotina", project_id=ciclo.id)
+    db.add_task(conn, "projeto", project_id=projeto.id)
+    db.add_task(conn, "solta")
+
+    rc = services.review_metrics(conn, days=1)["run_change"]
+    assert rc["run"]["total"] == 3
+    assert rc["change"]["total"] == 1
+    assert rc["loose"]["total"] == 1
+    # o balde `loose` fica fora do denominador do share
+    assert rc["attributed"] == 4
+    assert rc["run_share"] == 0.75
+    assert rc["change_share"] == 0.25
+
+
+def test_run_change_without_tasks_has_no_share(conn):
+    rc = services.review_metrics(conn, days=7)["run_change"]
+    assert rc["attributed"] == 0
+    assert rc["run_share"] is None
+    assert rc["change_share"] is None
+
+
+def test_cycles_on_sla_ignores_cycles_without_done_at(conn):
+    """Ciclo fechado sem data não conta como cumprido — sai do denominador."""
+    ciclo = _ciclo_de_hoje(conn)
+    db.complete_project(conn, ciclo.id, closed_on=ciclo.deadline)
+
+    rc = services.review_metrics(conn, days=7)["run_change"]
+    assert rc["cycles_total"] == 1
+    assert rc["cycles_closed"] == 1
+    assert rc["cycles_on_sla"] == 1
+    assert rc["cycles_unknown"] == 0
+    assert rc["cycles_sla_rate"] == 1.0
+
+    conn.execute("UPDATE projects SET done_at = NULL WHERE id = ?", (ciclo.id,))
+    conn.commit()
+    rc = services.review_metrics(conn, days=7)["run_change"]
+    assert rc["cycles_unknown"] == 1
+    assert rc["cycles_sla_rate"] is None
+
+
+def test_cycle_closed_late_is_not_on_sla(conn):
+    from datetime import date, timedelta
+
+    ciclo = _ciclo_de_hoje(conn)
+    atrasado = (date.fromisoformat(ciclo.deadline) + timedelta(days=1)).isoformat()
+    db.complete_project(conn, ciclo.id, closed_on=atrasado)
+    rc = services.review_metrics(conn, days=7)["run_change"]
+    assert rc["cycles_on_sla"] == 0
+    assert rc["cycles_sla_rate"] == 0.0
+
+
+def test_stages_done_counted_in_the_window(conn):
+    ciclo = _ciclo_de_hoje(conn)
+    db.complete_stage(conn, db.list_stages(conn, ciclo.id)[0].id)
+    assert services.review_metrics(conn, days=7)["run_change"]["stages_done"] == 1
+
+
+def test_per_day_colours_by_nature(conn):
+    ciclo = _ciclo_de_hoje(conn)
+    t = db.add_task(conn, "rotina", project_id=ciclo.id)
+    db.complete_task(conn, t.id)
+
+    ultimo = services.review_metrics(conn, days=1)["per_day"][-1]
+    assert ultimo["done"] == 1
+    assert ultimo["run"] == 1
+    assert ultimo["change"] == 0
+
+
+def test_by_project_carries_kind(conn):
+    ciclo = _ciclo_de_hoje(conn)
+    db.add_task(conn, "rotina", project_id=ciclo.id)
+    by_project = services.review_metrics(conn, days=1)["by_project"]
+    assert by_project[str(ciclo.id)]["kind"] == "routine_run"

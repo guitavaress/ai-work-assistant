@@ -1012,6 +1012,27 @@ def find_routine_run(
     return Project(**row) if row else None
 
 
+def list_routine_runs_due_between(
+    conn: sqlite3.Connection, start: str, end: str
+) -> list[Project]:
+    """Ciclos cujo prazo cai na janela — é o prazo que define o evento de SLA."""
+    rows = conn.execute(
+        f"SELECT {PROJECT_COLUMNS} FROM projects WHERE kind = 'routine_run'"
+        " AND deadline IS NOT NULL AND deadline BETWEEN ? AND ? ORDER BY deadline, id",
+        (start, end),
+    )
+    return [Project(**row) for row in rows]
+
+
+def count_stages_done_between(conn: sqlite3.Connection, start: str, end: str) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM stages WHERE status = 'done'"
+        " AND done_at IS NOT NULL AND substr(done_at, 1, 10) BETWEEN ? AND ?",
+        (start, end),
+    ).fetchone()
+    return row["n"]
+
+
 def list_routine_runs(
     conn: sqlite3.Connection, routine_id: int, include_done: bool = True
 ) -> list[Project]:

@@ -310,8 +310,10 @@ def test_review_metrics_endpoint(client, conn):
     assert body["carryover_rate"] == 0.0
     assert body["by_tag"]["dados"]["overdue"] == 1
     assert body["by_effort"]["P"]["done"] == 1
-    assert len(body["done_per_day"]) == 7
-    assert body["done_per_day"][-1] == {"day": db.today(), "done": 1}
+    assert len(body["per_day"]) == 7
+    assert body["per_day"][-1] == {
+        "day": db.today(), "done": 1, "run": 0, "change": 0, "loose": 1
+    }
 
 
 def test_review_assessment(client, conn, monkeypatch):
@@ -569,3 +571,49 @@ def test_routine_sla_history_ignores_cycles_without_done_at(client, conn):
     rotina = client.get("/api/state").json()["routines"][0]
     assert rotina["sla_history"]["closed"] == 0  # fechado sem data fica fora do cálculo
     assert rotina["sla_history"]["rate"] is None
+
+
+def test_edit_task_sets_stage(client, conn):
+    p, etapa = _projeto_com_etapas(conn)
+    task = db.add_task(conn, "Investigar divergência")
+    edited = client.post(
+        f"/api/tasks/{task.id}", json={"project_id": p.id, "stage_id": etapa.id}
+    ).json()
+    assert edited["stage_id"] == etapa.id
+    assert edited["stage_name"] == "Reconciliar"
+    assert edited["project_id"] == p.id
+
+
+def test_edit_task_stage_from_another_project_422(client, conn):
+    """Sem a guarda, a tarefa migraria em silêncio para o projeto da etapa."""
+    p, etapa = _projeto_com_etapas(conn)
+    outro = db.add_project(conn, "Outro", "meta")
+    task = db.add_task(conn, "x", project_id=outro.id)
+
+    resp = client.post(f"/api/tasks/{task.id}", json={"project_id": outro.id, "stage_id": etapa.id})
+    assert resp.status_code == 422
+    assert "não pertence" in resp.json()["detail"]
+    assert db.get_task(conn, task.id).project_id == outro.id
+
+
+def test_edit_task_changing_project_drops_the_stage(client, conn):
+    p, etapa = _projeto_com_etapas(conn)
+    outro = db.add_project(conn, "Outro", "meta")
+    task = db.add_task(conn, "x", stage_id=etapa.id)
+
+    edited = client.post(f"/api/tasks/{task.id}", json={"project_id": outro.id}).json()
+    assert edited["project_id"] == outro.id
+    assert edited["stage_id"] is None
+
+
+def test_edit_task_keeps_stage_when_resent(client, conn):
+    """Regressão: salvar o popover sem mexer no destino não pode apagar a etapa."""
+    p, etapa = _projeto_com_etapas(conn)
+    task = db.add_task(conn, "x", stage_id=etapa.id)
+
+    edited = client.post(
+        f"/api/tasks/{task.id}",
+        json={"project_id": p.id, "stage_id": etapa.id, "tags": ["dados"]},
+    ).json()
+    assert edited["stage_id"] == etapa.id
+    assert db.get_task(conn, task.id).stage_id == etapa.id

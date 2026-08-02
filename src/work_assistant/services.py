@@ -411,6 +411,56 @@ def _avg_lead_days(tasks: list[db.Task]) -> float | None:
     return round(sum(leads) / len(leads), 1) if leads else None
 
 
+def _run_change(
+    conn: sqlite3.Connection, tasks: list[db.Task], nature, start: str, end: str
+) -> dict:
+    """Divide o período entre operação (run) e entrega (change).
+
+    Tarefa sem projeto fica num balde `loose` próprio e FORA do share: ela não é
+    nem run nem change, e jogá-la em change inflaria o trabalho de projeto com
+    ruído não rastreado — justamente o número que vai para a conversa com o gestor.
+    """
+    buckets = {k: [] for k in ("run", "change", "loose")}
+    for t in tasks:
+        buckets[nature(t)].append(t)
+
+    def summarize(ts: list[db.Task]) -> dict:
+        return {
+            "total": len(ts),
+            "done": sum(1 for t in ts if t.status == "done"),
+            "overdue": sum(
+                1 for t in ts if t.status != "done" and t.due_date and t.due_date < end
+            ),
+            "avg_lead_days": _avg_lead_days([t for t in ts if t.status == "done"]),
+        }
+
+    attributed = len(buckets["run"]) + len(buckets["change"])
+    # O evento de SLA é o prazo do ciclo, não a abertura: a janela de N dias
+    # fatiaria o mês arbitrariamente se contasse pela data de início.
+    cycles = db.list_routine_runs_due_between(conn, start, end)
+    closed = [c for c in cycles if c.status == "done"]
+    with_date = [c for c in closed if c.done_at and c.deadline]
+    on_sla = [c for c in with_date if c.done_at[:10] <= c.deadline]
+    unknown = len(closed) - len(with_date)
+
+    return {
+        "run": summarize(buckets["run"]),
+        "change": summarize(buckets["change"]),
+        "loose": summarize(buckets["loose"]),
+        "attributed": attributed,
+        "run_share": _rate(len(buckets["run"]), attributed),
+        "change_share": _rate(len(buckets["change"]), attributed),
+        "cycles_total": len(cycles),
+        "cycles_closed": len(closed),
+        "cycles_on_sla": len(on_sla),
+        # Ciclos fechados antes da migração do done_at: contados à parte e fora
+        # do denominador, para não virarem "cumpriu o SLA" por omissão.
+        "cycles_unknown": unknown,
+        "cycles_sla_rate": _rate(len(on_sla), len(with_date)),
+        "stages_done": db.count_stages_done_between(conn, start, end),
+    }
+
+
 def review_metrics(conn: sqlite3.Connection, days: int = 14) -> dict:
     """Métricas de execução do período — só dados locais, sem LLM."""
     end = date.today()
@@ -426,13 +476,26 @@ def review_metrics(conn: sqlite3.Connection, days: int = 14) -> dict:
     same_day = [t for t in done if (t.done_at or "")[:10] == t.day]
     unplanned = [t for t in tasks if t.source != "plan"]
 
-    done_per_day = {
-        (start + timedelta(days=i)).isoformat(): 0 for i in range(days)
+    # kind=None: ciclos de rotina também precisam de nome e natureza nas métricas.
+    projects = db.list_projects(conn, include_done=True, kind=None)
+    project_names = {p.id: p.name for p in projects}
+    kind_by_project = {p.id: p.kind for p in projects}
+
+    def nature(t: db.Task) -> str:
+        """run = ciclo de rotina, change = projeto, loose = sem vínculo."""
+        if not t.project_id:
+            return "loose"
+        return "run" if kind_by_project.get(t.project_id) == "routine_run" else "change"
+
+    per_day = {
+        (start + timedelta(days=i)).isoformat(): {"done": 0, "run": 0, "change": 0, "loose": 0}
+        for i in range(days)
     }
     for t in done:
         d = (t.done_at or "")[:10]
-        if d in done_per_day:
-            done_per_day[d] += 1
+        if d in per_day:
+            per_day[d]["done"] += 1
+            per_day[d][nature(t)] += 1
 
     by_effort = {}
     for level in db.EFFORT_LEVELS:
@@ -465,13 +528,10 @@ def review_metrics(conn: sqlite3.Connection, days: int = 14) -> dict:
     for t in tasks:
         if t.project_id:
             grouped_by_project.setdefault(t.project_id, []).append(t)
-    # kind=None: ciclos de rotina também precisam de nome nas métricas.
-    project_names = {
-        p.id: p.name for p in db.list_projects(conn, include_done=True, kind=None)
-    }
     by_project = {
         str(pid): {
             "name": project_names.get(pid, f"Projeto #{pid}"),
+            "kind": kind_by_project.get(pid, "project"),
             "total": len(ts),
             "done": sum(1 for t in ts if t.status == "done"),
             "overdue": sum(
@@ -493,7 +553,8 @@ def review_metrics(conn: sqlite3.Connection, days: int = 14) -> dict:
         "unplanned_rate": _rate(len(unplanned), len(tasks)),
         "avg_lead_days": _avg_lead_days(done),
         "throughput_per_week": round(len(done) * 7 / days, 1),
-        "done_per_day": [{"day": d, "done": n} for d, n in done_per_day.items()],
+        "per_day": [{"day": d, **counts} for d, counts in per_day.items()],
+        "run_change": _run_change(conn, tasks, nature, start.isoformat(), today),
         "by_effort": by_effort,
         "by_tag": by_tag,
         "by_project": by_project,
@@ -516,6 +577,24 @@ def _metrics_context(m: dict) -> str:
         f"Lead time médio: {m['avg_lead_days'] if m['avg_lead_days'] is not None else 'sem dados'}"
         f" dias. Throughput: {m['throughput_per_week']} tarefas/semana.",
     ]
+    rc = m["run_change"]
+    if rc["attributed"]:
+        lines.append(
+            f"Operação x entrega: {_pct(rc['run_share'])} do trabalho com vínculo foi rotina"
+            f" ({rc['run']['total']} tarefas) e {_pct(rc['change_share'])} foi projeto"
+            f" ({rc['change']['total']} tarefas)."
+        )
+        if rc["loose"]["total"]:
+            lines.append(
+                f"Fora desse cálculo: {rc['loose']['total']} tarefas sem projeto nem ciclo."
+            )
+    if rc["cycles_closed"]:
+        lines.append(
+            f"Ciclos de rotina: {rc['cycles_closed']} fechados de {rc['cycles_total']} com prazo"
+            f" no período; {rc['cycles_on_sla']} dentro do SLA ({_pct(rc['cycles_sla_rate'])})."
+        )
+    if rc["stages_done"]:
+        lines.append(f"Etapas concluídas no período: {rc['stages_done']}.")
     if m["overdue"]:
         lines.append("Tarefas atrasadas:")
         lines.extend(f"- {t['title']} (prazo {t['due']})" for t in m["overdue"])
