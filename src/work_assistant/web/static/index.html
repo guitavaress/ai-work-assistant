@@ -698,8 +698,20 @@ function renderHoje() {
       : '<div class="empty" style="padding:0; font-size:13px;">Nenhum projeto ativo.</div>')
     + '</div>';
   html += '<div class="scard"><div class="scard-title">Ritual do dia</div>'
-    + '<div class="scard-sub">Checkpoint de projeto e análise da execução.</div>'
-    + '<div class="quick">'
+    + '<div class="scard-sub">O que hoje exige de você.</div>'
+    + (S.ritual.length
+      ? '<div class="ritual">' + S.ritual.map(r =>
+          '<div class="ritual-item ritual-' + r.level + '">'
+          + '<span class="ritual-dot"></span>'
+          + '<span><span class="ritual-text">' + esc(r.title) + '</span>'
+          + '<span class="ritual-detail"> — ' + esc(r.detail) + '</span>'
+          + ' <button class="btn-link" onclick="' + (r.action === 'close'
+              ? 'closeCycle(' + r.project_id + ')'
+              : 'openCheckpointFor(' + r.project_id + ')') + '">'
+          + (r.action === 'close' ? 'fechar' : 'checkpoint') + '</button></span></div>'
+        ).join('') + '</div>'
+      : '<div class="ritual-empty">Nada vencendo hoje.</div>')
+    + '<div class="quick" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">'
     + '<button class="btn" onclick="openCheckpoint()">Checkpoint</button>'
     + '<button class="btn" onclick="go(\'rev\')">Análise</button>'
     + '</div></div>';
@@ -1025,6 +1037,7 @@ function openTaskEdit(id) {
   S.edit = {
     id: t.id,
     project_id: t.project_id || '',
+    stage_id: t.stage_id || '',
     tags: (t.tags || []).join(', '),
     due: t.due || '',
     effort: t.effort || '',
@@ -1032,14 +1045,26 @@ function openTaskEdit(id) {
   S.modal = 'edit';
   render();
 }
+// Trocar o destino invalida a etapa: ela pertence a um projeto só (regra do backend).
+function onEditProjectChange() {
+  const v = document.getElementById('edit-project').value;
+  S.edit.project_id = v ? Number(v) : '';
+  S.edit.stage_id = '';
+  S.edit.tags = document.getElementById('edit-tags').value;
+  S.edit.due = document.getElementById('edit-due').value;
+  S.edit.effort = document.getElementById('edit-eff').value;
+  render();
+}
 async function saveTaskEdit() {
   const projectVal = document.getElementById('edit-project').value;
   const project_id = projectVal ? Number(projectVal) : null;
+  const stageVal = document.getElementById('edit-stage').value;
+  const stage_id = stageVal ? Number(stageVal) : null;
   const tags = document.getElementById('edit-tags').value.split(',').map(t => t.trim()).filter(Boolean);
   const due_date = document.getElementById('edit-due').value || null;
   const effort = document.getElementById('edit-eff').value || null;
   try {
-    await api('/api/tasks/' + S.edit.id, { project_id, tags, due_date, effort });
+    await api('/api/tasks/' + S.edit.id, { project_id, stage_id, tags, due_date, effort });
     S.modal = null;
     S.review.metrics = null;
     await loadState();
@@ -1205,14 +1230,26 @@ function renderModal() {
   } else if (S.modal === 'edit') {
     // Inclui os ciclos de rotina: sem eles, uma tarefa de ciclo abriria o popover sem
     // a própria opção e o save gravaria "sem projeto", perdendo o vínculo.
+    // Inclui os ciclos de rotina: sem eles, uma tarefa de ciclo abriria o popover sem
+    // a própria opção e o save gravaria "sem projeto", perdendo o vínculo.
     const active = S.projects.concat(S.routine_runs)
       .filter(p => p.active || p.id === S.edit.project_id);
+    const alvo = active.find(p => p.id === S.edit.project_id);
+    const etapas = alvo ? alvo.stages : [];
     inner = '<div class="modal-title">Editar tarefa</div>'
-      + '<div class="modal-sub" style="font-size:13.5px;">Projeto, tags, prazo e esforço.</div>'
-      + '<div class="efield"><label>Projeto</label>'
-      + '<select id="edit-project"><option value="">— sem projeto —</option>'
-      + active.map(p => '<option value="' + p.id + '"' + (p.id === S.edit.project_id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('')
+      + '<div class="modal-sub" style="font-size:13.5px;">Destino, etapa, tags, prazo e esforço.</div>'
+      + '<div class="efield-row">'
+      + '<div class="efield"><label>Projeto ou ciclo</label>'
+      + '<select id="edit-project" onchange="onEditProjectChange()"><option value="">— sem projeto —</option>'
+      + active.map(p => '<option value="' + p.id + '"' + (p.id === S.edit.project_id ? ' selected' : '') + '>'
+          + (p.kind === 'routine_run' ? '⟳ ' : '') + esc(p.name) + '</option>').join('')
       + '</select></div>'
+      + '<div class="efield"><label>Etapa</label>'
+      + '<select id="edit-stage"' + (etapas.length ? '' : ' disabled') + '>'
+      + '<option value="">' + (alvo ? (etapas.length ? '— sem etapa —' : 'sem etapas neste destino') : '— escolha o destino —') + '</option>'
+      + etapas.map(st => '<option value="' + st.id + '"' + (st.id === S.edit.stage_id ? ' selected' : '') + '>'
+          + st.position + '. ' + esc(st.name) + '</option>').join('')
+      + '</select></div></div>'
       + '<div class="efield"><label>Tags (separadas por vírgula)</label>'
       + '<input id="edit-tags" placeholder="ex.: bug, dados" value="' + esc(S.edit.tags) + '"></div>'
       + '<div class="efield-row">'
