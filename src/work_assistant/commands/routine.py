@@ -73,7 +73,10 @@ def add(
         help="Mensal: dia do mês (-1 = último). Semanal: 1 = segunda a 7 = domingo. Diária: não use",
     ),
     sla_days: int = typer.Option(
-        0, "--sla-days", "-s", help="Dias entre a abertura e o prazo (abre dia 1, SLA dia 5 = 4)"
+        1,
+        "--sla-days",
+        "-s",
+        help="Duração da janela em dias, contando o dia de abertura (abre dia 1, fecha dia 5 = 5)",
     ),
 ):
     """Cadastra uma rotina. Depois use `wa routine steps` para montar o checklist."""

@@ -36,9 +36,11 @@ def test_opens_on_weekly():
 
 
 def test_closes_on_crosses_the_month():
-    assert schedule.closes_on("monthly", 1, 4, "2026-08") == date(2026, 8, 5)
-    # último dia de janeiro + 2 dias cai em fevereiro
-    assert schedule.closes_on("monthly", -1, 2, "2026-01") == date(2026, 2, 2)
+    # sla_days é a DURAÇÃO da janela, contando a abertura: abre 01, fecha 05
+    assert schedule.closes_on("monthly", 1, 5, "2026-08") == date(2026, 8, 5)
+    assert schedule.closes_on("monthly", 1, 1, "2026-08") == date(2026, 8, 1)
+    # janela de 3 dias a partir do último dia de janeiro cai em fevereiro
+    assert schedule.closes_on("monthly", -1, 3, "2026-01") == date(2026, 2, 2)
 
 
 def test_periods_between_monthly():
@@ -74,11 +76,11 @@ def test_next_open():
 
 
 def test_describe():
-    assert schedule.describe("monthly", 1, 4) == "mensal, dia 1 (+4d)"
-    assert schedule.describe("monthly", -1, 2) == "mensal, último dia (+2d)"
-    assert schedule.describe("monthly", -2, 0) == "mensal, penúltimo dia"
-    assert schedule.describe("weekly", 1, 1) == "semanal, segunda (+1d)"
-    assert schedule.describe("weekly", 3, 0) == "semanal, quarta"
+    assert schedule.describe("monthly", 1, 5) == "mensal, dia 1 (janela 5d)"
+    assert schedule.describe("monthly", -1, 2) == "mensal, último dia (janela 2d)"
+    assert schedule.describe("monthly", -2, 1) == "mensal, penúltimo dia"
+    assert schedule.describe("weekly", 1, 1) == "semanal, segunda"
+    assert schedule.describe("weekly", 3, 3) == "semanal, quarta (janela 3d)"
 
 
 def test_validate_cadence_error():
@@ -143,8 +145,8 @@ def test_daily_next_open_jumps_the_weekend():
 
 
 def test_daily_closes_on():
-    assert schedule.closes_on("daily", 0, 0, "2026-08-03") == date(2026, 8, 3)
-    assert schedule.closes_on("daily", 0, 1, "2026-08-03") == date(2026, 8, 4)
+    assert schedule.closes_on("daily", 0, 1, "2026-08-03") == date(2026, 8, 3)
+    assert schedule.closes_on("daily", 0, 2, "2026-08-03") == date(2026, 8, 4)
 
 
 def test_daily_invalid_period():
@@ -168,31 +170,88 @@ def test_period_label():
 
 
 def test_window_label_monthly():
-    assert schedule.window_label("monthly", 1, 4) == "01–05 de cada mês"
-    assert schedule.window_label("monthly", 1, 0) == "dia 01 de cada mês"
+    assert schedule.window_label("monthly", 1, 5) == "01–05 de cada mês"
+    assert schedule.window_label("monthly", 1, 1) == "dia 01 de cada mês"
     # acima do dia 28 a faixa viraria mentira em fevereiro
-    assert schedule.window_label("monthly", 28, 4) == "dia 28 + 4d de cada mês"
+    assert schedule.window_label("monthly", 28, 5) == "dia 28 + 4d de cada mês"
 
 
 def test_window_label_monthly_negative_anchor():
-    assert schedule.window_label("monthly", -1, 0) == "último dia de cada mês"
-    assert schedule.window_label("monthly", -1, 3) == "último dia + 3d de cada mês"
-    assert schedule.window_label("monthly", -2, 0) == "penúltimo dia de cada mês"
-    assert schedule.window_label("monthly", -5, 0) == "5º dia do fim de cada mês"
+    assert schedule.window_label("monthly", -1, 1) == "último dia de cada mês"
+    assert schedule.window_label("monthly", -1, 4) == "último dia + 3d de cada mês"
+    assert schedule.window_label("monthly", -2, 1) == "penúltimo dia de cada mês"
+    assert schedule.window_label("monthly", -5, 1) == "5º dia do fim de cada mês"
 
 
 def test_window_label_weekly_and_daily():
-    assert schedule.window_label("weekly", 1, 0) == "toda segunda"
-    assert schedule.window_label("weekly", 1, 4) == "de segunda a sexta"
-    assert schedule.window_label("weekly", 5, 4) == "toda sexta + 4d"
-    assert schedule.window_label("daily", 0, 0) == "todo dia útil"
-    assert schedule.window_label("daily", 0, 1) == "todo dia útil + 1d"
+    assert schedule.window_label("weekly", 1, 1) == "toda segunda"
+    assert schedule.window_label("weekly", 1, 5) == "de segunda a sexta"
+    assert schedule.window_label("weekly", 5, 5) == "toda sexta + 4d"
+    assert schedule.window_label("daily", 0, 1) == "todo dia útil"
+    assert schedule.window_label("daily", 0, 2) == "todo dia útil + 1d"
 
 
 def test_describe_daily():
-    assert schedule.describe("daily", 0, 1) == "diária, todo dia útil (+1d)"
+    assert schedule.describe("daily", 0, 1) == "diária, todo dia útil"
+    assert schedule.describe("daily", 0, 2) == "diária, todo dia útil (janela 2d)"
 
 
-def test_invalid_cadence_message_lists_daily():
-    with pytest.raises(ValueError, match="daily, weekly ou monthly"):
+def test_invalid_cadence_message_lists_the_options():
+    with pytest.raises(ValueError, match="daily, weekly, monthly, quarterly"):
         schedule.validate_cadence("anual")
+
+
+# --- Cadência trimestral ----------------------------------------------------
+
+
+def test_quarterly_period_key():
+    assert schedule.period_key("quarterly", date(2026, 1, 15)) == "2026-T1"
+    assert schedule.period_key("quarterly", date(2026, 3, 31)) == "2026-T1"
+    assert schedule.period_key("quarterly", date(2026, 4, 1)) == "2026-T2"
+    assert schedule.period_key("quarterly", date(2026, 12, 31)) == "2026-T4"
+
+
+def test_quarterly_opens_on_first_month_of_the_quarter():
+    assert schedule.opens_on("quarterly", 1, "2026-T1") == date(2026, 1, 1)
+    assert schedule.opens_on("quarterly", 1, "2026-T3") == date(2026, 7, 1)
+    assert schedule.opens_on("quarterly", 10, "2026-T4") == date(2026, 10, 10)
+
+
+def test_quarterly_uses_the_same_anchor_rules_as_monthly():
+    # clamp: 31 em abril (T2) cai no dia 30
+    assert schedule.opens_on("quarterly", 31, "2026-T2") == date(2026, 4, 30)
+    # âncora negativa conta do fim do primeiro mês do trimestre
+    assert schedule.opens_on("quarterly", -1, "2026-T1") == date(2026, 1, 31)
+    assert schedule.opens_on("quarterly", -1, "2026-T2") == date(2026, 4, 30)
+
+
+def test_quarterly_closes_on_uses_duration():
+    assert schedule.closes_on("quarterly", 1, 10, "2026-T3") == date(2026, 7, 10)
+    assert schedule.closes_on("quarterly", 1, 1, "2026-T3") == date(2026, 7, 1)
+
+
+def test_quarterly_periods_between_crosses_the_year():
+    found = schedule.periods_between("quarterly", 1, date(2026, 6, 1), date(2027, 2, 1))
+    # T2/2026 abriu em 01/04, antes do start; entram T3, T4 e T1 de 2027
+    assert found == ["2026-T3", "2026-T4", "2027-T1"]
+
+
+def test_quarterly_next_open():
+    assert schedule.next_open("quarterly", 1, date(2026, 8, 2)) == date(2026, 10, 1)
+    assert schedule.next_open("quarterly", 15, date(2026, 7, 1)) == date(2026, 7, 15)
+
+
+def test_quarterly_labels():
+    assert schedule.cadence_label("quarterly") == "trimestral"
+    assert schedule.period_label("quarterly", "2026-T3") == "ciclo 2026-T3"
+    assert schedule.window_label("quarterly", 1, 1) == "dia 01 do 1º mês de cada trimestre"
+    assert schedule.window_label("quarterly", 1, 10) == "dia 01 do 1º mês + 9d de cada trimestre"
+    assert schedule.window_label("quarterly", -1, 1) == "último dia do 1º mês de cada trimestre"
+    assert schedule.describe("quarterly", 1, 10) == "trimestral, dia 1 (janela 10d)"
+
+
+def test_quarterly_invalid_period():
+    with pytest.raises(ValueError, match="YYYY-Tn"):
+        schedule.opens_on("quarterly", 1, "2026-T5")
+    with pytest.raises(ValueError, match="YYYY-Tn"):
+        schedule.opens_on("quarterly", 1, "2026-08")

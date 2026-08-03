@@ -252,7 +252,7 @@ def _janela():
     return runner.invoke(
         app,
         ["routine", "add", "Janela de Comissões", "-g", "fechar no SLA",
-         "-c", "monthly", "-o", "1", "-s", "4"],
+         "-c", "monthly", "-o", "1", "-s", "5"],
     )
 
 
@@ -261,7 +261,7 @@ def test_routine_add_and_list(monkeypatch):
     result = _janela()
     assert result.exit_code == 0
     assert "Rotina #1 criada" in result.output
-    assert "mensal, dia 1 (+4d)" in result.output
+    assert "mensal, dia 1 (janela 5d)" in result.output
 
     result = runner.invoke(app, ["routine", "list"])
     assert result.exit_code == 0

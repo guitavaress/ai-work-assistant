@@ -67,7 +67,8 @@ CREATE TABLE IF NOT EXISTS routines (
     cadence TEXT NOT NULL,                   -- monthly | weekly
     anchor INTEGER NOT NULL,                 -- mensal: dia 1..31 ou -1..-28 (do fim do mês)
                                              -- semanal: dia ISO 1..7 (1 = segunda)
-    sla_days INTEGER NOT NULL DEFAULT 0,     -- prazo do ciclo = abertura + sla_days
+    sla_days INTEGER NOT NULL DEFAULT 1,     -- duração da janela em dias, contando o
+                                             -- dia de abertura (abre 1, fecha 5 = 5)
     status TEXT NOT NULL DEFAULT 'active',   -- active | archived
     created_at TEXT NOT NULL
 );
@@ -127,6 +128,12 @@ _MIGRATIONS = {
         "done_at": "ALTER TABLE projects ADD COLUMN done_at TEXT",
     },
 }
+
+# Versão do ESQUEMA DE DADO deste pacote, guardada no `PRAGMA user_version` do
+# arquivo .db. Atenção: o pragma é global do arquivo, que é compartilhado com
+# outras branches (ver comentário das constantes de coluna abaixo).
+#   1 — sla_days passou de deslocamento para duração da janela.
+SCHEMA_VERSION = 1
 
 EFFORT_LEVELS = ("P", "M", "G")
 STAGE_STATUSES = ("pending", "done")
@@ -263,6 +270,7 @@ def connect(db_path: Path | None = None) -> sqlite3.Connection:
     conn.executescript(SCHEMA)
     _migrate(conn)
     conn.executescript(INDEXES)  # depois do _migrate: dependem das colunas novas
+    _migrate_data(conn)
     return conn
 
 
@@ -273,6 +281,23 @@ def _migrate(conn: sqlite3.Connection) -> None:
             if column not in existing:
                 conn.execute(ddl)
     conn.commit()
+
+
+def _migrate_data(conn: sqlite3.Connection) -> None:
+    """Migrações que transformam DADO, não estrutura.
+
+    `_MIGRATIONS` é keyed por coluna ausente (`PRAGMA table_info`), então só serve
+    para criar coluna: uma transformação ali rodaria de novo a cada `connect()`.
+    O contador é o `PRAGMA user_version` do próprio SQLite.
+    """
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if version < 1:
+        # v1: sla_days deixou de ser deslocamento e virou duração da janela,
+        # contando o dia de abertura (abre dia 1, fecha dia 5 = 5).
+        conn.execute("UPDATE routines SET sla_days = sla_days + 1")
+    if version < SCHEMA_VERSION:
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")  # não aceita bind
+        conn.commit()
 
 
 def _now() -> str:
@@ -863,12 +888,15 @@ def add_routine(
     goal: str,
     cadence: str,
     anchor: int,
-    sla_days: int = 0,
+    sla_days: int = 1,
 ) -> Routine:
     cadence = schedule.validate_cadence(cadence)
     anchor = schedule.validate_anchor(cadence, anchor)
-    if sla_days < 0:
-        raise ValueError(f"SLA inválido '{sla_days}': use 0 ou mais dias")
+    if sla_days < 1:
+        raise ValueError(
+            f"SLA inválido '{sla_days}': a janela tem no mínimo 1 dia"
+            " (é a duração contando o dia de abertura)"
+        )
     cur = conn.execute(
         "INSERT INTO routines (name, goal, cadence, anchor, sla_days, created_at)"
         " VALUES (?, ?, ?, ?, ?, ?)",

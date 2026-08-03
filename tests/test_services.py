@@ -10,7 +10,7 @@ def conn(tmp_path):
     return db.connect(tmp_path / "test.db")
 
 
-def _janela(conn, created_at="2026-08-01", anchor=1, sla_days=4, cadence="monthly"):
+def _janela(conn, created_at="2026-08-01", anchor=1, sla_days=5, cadence="monthly"):
     """Rotina mensal com 3 passos, com created_at forçado para testar backfill."""
     routine = db.add_routine(
         conn, "Janela de Comissões", "fechar no SLA", cadence, anchor, sla_days=sla_days
@@ -43,7 +43,7 @@ def test_materializes_the_cycle_with_stages(conn):
     assert ciclo.kind == "routine_run"
     assert ciclo.period == "2026-08"
     assert ciclo.goal == routine.goal  # cópia do objetivo da rotina
-    assert ciclo.deadline == "2026-08-05"  # abertura 01/08 + sla_days 4
+    assert ciclo.deadline == "2026-08-05"  # abre 01/08, janela de 5 dias
 
     stages = db.list_stages(conn, ciclo.id)
     assert [(s.name, s.position, s.deadline) for s in stages] == [
@@ -113,7 +113,7 @@ def test_name_collision_with_a_manual_project(conn):
 
 
 def test_weekly_routine(conn):
-    _janela(conn, created_at="2026-08-01", anchor=1, sla_days=1, cadence="weekly")
+    _janela(conn, created_at="2026-08-01", anchor=1, sla_days=2, cadence="weekly")
     created = services.ensure_routines(conn, today="2026-08-12")
     # segundas de agosto a partir do dia 01: 03/08 e 10/08
     assert [p.period for p in created] == ["2026-W32", "2026-W33"]
@@ -129,7 +129,7 @@ def test_routine_view(conn):
     db.add_task(conn, "Baixar arquivo", stage_id=stages[0].id)
 
     view = services.routine_view(conn, routine)
-    assert view["cadence"] == "mensal, dia 1 (+4d)"
+    assert view["cadence"] == "mensal, dia 1 (janela 5d)"
     assert [s.name for s in view["steps"]] == ["Extrair base", "Reconciliar", "Publicar"]
     assert view["runs"][0]["stages"] == {"total": 3, "done": 1}
     assert view["runs"][0]["tasks"] == {"total": 1, "done": 0}
@@ -435,7 +435,7 @@ def _ciclo_de_hoje(conn):
     from work_assistant import schedule
 
     hoje = date.fromisoformat(db.today())
-    routine = db.add_routine(conn, "Janela", "meta", "daily", 0, sla_days=0)
+    routine = db.add_routine(conn, "Janela", "meta", "daily", 0, sla_days=1)
     db.replace_routine_steps(conn, routine.id, [{"name": "Extrair", "offset_days": 0}])
     return services.materialize_run(conn, routine, schedule.period_key("daily", hoje))
 

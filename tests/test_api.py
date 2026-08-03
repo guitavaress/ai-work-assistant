@@ -363,7 +363,7 @@ def _rotina(conn):
     O created_at é recuado de propósito: uma rotina criada depois da abertura do
     período não materializa o ciclo corrente (é o que `wa routine run` resolve).
     """
-    routine = db.add_routine(conn, "Janela de Comissões", "fechar no SLA", "monthly", 1, sla_days=4)
+    routine = db.add_routine(conn, "Janela de Comissões", "fechar no SLA", "monthly", 1, sla_days=5)
     db.replace_routine_steps(
         conn,
         routine.id,

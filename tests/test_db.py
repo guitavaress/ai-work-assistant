@@ -436,8 +436,8 @@ def test_checkpoint_with_stage(conn):
 
 
 def test_add_and_find_routine(conn):
-    r = db.add_routine(conn, "Janela de Comissões", "fechar no SLA", "monthly", 1, sla_days=4)
-    assert (r.cadence, r.anchor, r.sla_days, r.status) == ("monthly", 1, 4, "active")
+    r = db.add_routine(conn, "Janela de Comissões", "fechar no SLA", "monthly", 1, sla_days=5)
+    assert (r.cadence, r.anchor, r.sla_days, r.status) == ("monthly", 1, 5, "active")
     assert db.find_routine(conn, "janela de comissões").id == r.id
     assert db.find_routine(conn, str(r.id)).id == r.id
     with pytest.raises(LookupError):
@@ -450,7 +450,7 @@ def test_add_routine_validates_cadence_and_anchor(conn):
     with pytest.raises(ValueError, match="Dia de abertura inválido"):
         db.add_routine(conn, "Y", "meta", "monthly", 40)
     with pytest.raises(ValueError, match="SLA inválido"):
-        db.add_routine(conn, "Z", "meta", "monthly", 1, sla_days=-1)
+        db.add_routine(conn, "Z", "meta", "monthly", 1, sla_days=0)
 
 
 def test_archive_routine_leaves_the_active_list(conn):
@@ -550,3 +550,46 @@ def test_old_closed_project_keeps_done_at_null(conn):
     conn.execute("UPDATE projects SET status = 'done' WHERE id = ?", (p.id,))
     conn.commit()
     assert db.get_project(conn, p.id).done_at is None
+
+
+def test_sla_days_migration_runs_exactly_once(tmp_path):
+    """sla_days era deslocamento e virou duração: +1, mas só na primeira vez.
+
+    Este é o motivo de existir `_migrate_data` separado do `_MIGRATIONS`: aquele
+    é keyed por coluna ausente e rodaria a transformação a cada connect().
+    """
+    import sqlite3
+
+    path = tmp_path / "antigo.db"
+    old = sqlite3.connect(path)
+    old.executescript(
+        """
+        CREATE TABLE routines (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE,
+            goal TEXT NOT NULL, cadence TEXT NOT NULL, anchor INTEGER NOT NULL,
+            sla_days INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL
+        );
+        INSERT INTO routines (name, goal, cadence, anchor, sla_days, created_at)
+            VALUES ('Janela', 'meta', 'monthly', 1, 4, '2026-01-01');
+        """
+    )
+    old.commit()
+    old.close()
+
+    conn = db.connect(path)
+    assert db.get_routine(conn, 1).sla_days == 5  # 4 de deslocamento = 5 de duração
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
+
+    db.connect(path)
+    db.connect(path)
+    assert db.get_routine(conn, 1).sla_days == 5  # não incrementa de novo
+
+
+def test_new_database_is_marked_with_the_schema_version(conn):
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
+
+
+def test_add_routine_rejects_zero_sla(conn):
+    with pytest.raises(ValueError, match="no mínimo 1 dia"):
+        db.add_routine(conn, "X", "meta", "monthly", 1, sla_days=0)
