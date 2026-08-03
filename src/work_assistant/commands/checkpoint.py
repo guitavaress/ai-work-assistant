@@ -78,5 +78,13 @@ def checkpoint(
         result = services.run_checkpoint(conn, project, progress, stage=stage)
 
     console.print()
+    if result["verdicts"]:
+        cores = {"atende": "green", "nao_atende": "red", "nao_avaliada": "dim"}
+        for v in result["verdicts"]:
+            cor = cores[v["verdict"]]
+            console.print(f"[{cor}]{v['label']:>12}[/{cor}]  {v['stage_name']}")
+            if v["rationale"]:
+                console.print(f"[dim]{'':>12}  {v['rationale']}[/dim]")
+        console.print()
     console.print(Markdown(result["markdown"]))
     console.print("\n[dim]Checkpoint salvo.[/dim]")

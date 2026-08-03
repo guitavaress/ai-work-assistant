@@ -92,10 +92,16 @@ novo a cada 30 dias — é uma **janela** com SLA que se repete. Você cadastra 
 ```bash
 wa routine add "Janela de Comissões" \
   -g "comissões apuradas, conciliadas e comunicadas dentro do SLA" \
-  --cadence monthly --opens 1 --sla-days 4     # abre dia 1, prazo dia 5
+  --cadence monthly --opens 1 --sla-days 5     # janela de 5 dias: abre dia 1, fecha dia 5
 
 wa routine steps "Janela de Comissões"   # abre o $EDITOR: uma etapa por linha
 ```
+
+Cadências: `daily` (todo dia útil), `weekly`, `monthly` e `quarterly`. O `--sla-days`
+é a **duração da janela contando o dia de abertura** — abre dia 1 com 5 dias e fecha dia 5.
+
+Se preferir não usar o terminal, a aba **Rotinas** da interface web tem o mesmo cadastro
+em formulário, com o checklist montado etapa a etapa.
 
 No `$EDITOR`, o checklist é texto simples — `nome | dias após a abertura | critério de pronto`:
 

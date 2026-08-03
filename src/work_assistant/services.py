@@ -49,8 +49,23 @@ CHECKPOINT_SCHEMA = {
         "proximo_passo": {"type": "array", "items": {"type": "string"}},
         "status": {"type": "string", "enum": CHECKPOINT_STATUSES},
         "resumo": {"type": "string"},
+        # O modelo identifica a etapa pelo NOME (que ele recebe no contexto), nunca
+        # por id: pedir id a um LLM é convite para alucinação com chave estrangeira.
+        "vereditos": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "etapa": {"type": "string"},
+                    "veredito": {"type": "string", "enum": list(db.VERDICT_VALUES)},
+                    "justificativa": {"type": "string"},
+                },
+                "required": ["etapa", "veredito", "justificativa"],
+                "additionalProperties": False,
+            },
+        },
     },
-    "required": ["situacao", "riscos", "proximo_passo", "status", "resumo"],
+    "required": ["situacao", "riscos", "proximo_passo", "status", "resumo", "vereditos"],
     "additionalProperties": False,
 }
 
@@ -166,9 +181,88 @@ def ensure_routines(
     return created
 
 
-def close_routine_run(conn: sqlite3.Connection, project: db.Project) -> db.Project:
+def close_routine_run(
+    conn: sqlite3.Connection, project: db.Project, closed_on: str | None = None
+) -> db.Project:
     """Fecha o ciclo. Sempre manual: ver a janela do mês passado aberta é o sinal."""
-    return db.complete_project(conn, project.id)
+    return db.complete_project(conn, project.id, closed_on=closed_on)
+
+
+RITUAL_LIMIT = 3
+RITUAL_STALE_CHECKPOINT_DAYS = 7
+# Níveis batem com as classes .ritual-now / .ritual-open / .ritual-calm do design.
+_RITUAL_ORDER = {"now": 0, "open": 1, "calm": 2}
+
+
+def day_ritual(conn: sqlite3.Connection, today: str | None = None) -> list[dict]:
+    """O que o dia exige, no máximo 3 itens, do mais urgente ao menos.
+
+    `now`  — etapa corrente vencida num ciclo aberto (o que trava o SLA agora).
+    `open` — ciclo que passou do SLA e nunca foi fechado.
+    `calm` — projeto com prazo e sem checkpoint recente.
+    """
+    today = today or db.today()
+    items: list[dict] = []
+
+    for run in db.list_projects(conn, kind="routine_run"):
+        stages = db.list_stages(conn, run.id)
+        current = next((s for s in stages if s.status != "done"), None)
+        if current and current.deadline and current.deadline < today:
+            items.append(
+                {
+                    "level": "now",
+                    "title": run.name,
+                    "detail": f"{current.name} venceu em {current.deadline}",
+                    "action": "checkpoint",
+                    "target": f"r{run.id}",
+                    "project_id": run.id,
+                    "overdue": _days(current.deadline, today),
+                }
+            )
+        elif run.deadline and run.deadline < today:
+            items.append(
+                {
+                    "level": "open",
+                    "title": run.name,
+                    "detail": f"passou do SLA em {run.deadline} e continua aberto",
+                    "action": "close",
+                    "target": f"r{run.id}",
+                    "project_id": run.id,
+                    "overdue": _days(run.deadline, today),
+                }
+            )
+
+    stale = _shift(today, -RITUAL_STALE_CHECKPOINT_DAYS)
+    for project in db.list_projects(conn):
+        # Sem prazo não há urgência a alegar — é o que impede o ritual de virar ruído.
+        if not project.deadline:
+            continue
+        checkpoints = db.list_checkpoints(conn, project.id)
+        last = checkpoints[-1].created_at[:10] if checkpoints else None
+        if last is None or last < stale:
+            desde = f"último checkpoint em {last}" if last else "nunca teve checkpoint"
+            items.append(
+                {
+                    "level": "calm",
+                    "title": project.name,
+                    "detail": desde,
+                    "action": "checkpoint",
+                    "target": f"p{project.id}",
+                    "project_id": project.id,
+                    "overdue": 0,
+                }
+            )
+
+    items.sort(key=lambda i: (_RITUAL_ORDER[i["level"]], -i["overdue"], i["project_id"]))
+    return items[:RITUAL_LIMIT]
+
+
+def _days(start: str, end: str) -> int:
+    return (date.fromisoformat(end) - date.fromisoformat(start)).days
+
+
+def _shift(day: str, delta: int) -> str:
+    return (date.fromisoformat(day) + timedelta(days=delta)).isoformat()
 
 
 def routine_view(conn: sqlite3.Connection, routine: db.Routine) -> dict:
@@ -232,7 +326,7 @@ def run_checkpoint(
         f"**Riscos e desvios**: {result['riscos']}\n\n"
         f"**Próximo passo**:\n{steps}"
     )
-    db.add_checkpoint(
+    checkpoint = db.add_checkpoint(
         conn,
         project.id,
         progress,
@@ -241,6 +335,7 @@ def run_checkpoint(
         summary=result["resumo"],
         stage_id=stage.id if stage else None,
     )
+    verdicts = _save_verdicts(conn, project, checkpoint, result.get("vereditos") or [])
     return {
         "blocks": [
             {"title": "Situação", "body": result["situacao"]},
@@ -250,7 +345,51 @@ def run_checkpoint(
         "markdown": markdown,
         "status": result["status"],
         "summary": result["resumo"],
+        "verdicts": verdicts,
     }
+
+
+def _save_verdicts(
+    conn: sqlite3.Connection,
+    project: db.Project,
+    checkpoint: db.Checkpoint,
+    raw: list[dict],
+) -> list[dict]:
+    """Casa os vereditos do modelo (que vêm por nome) com as etapas reais.
+
+    Nome que não casa é descartado — alucinação não vira linha no banco. Etapa que
+    o modelo omitiu entra como `nao_avaliada`, para o histórico ficar completo.
+    """
+    stages = db.list_stages(conn, project.id)
+    if not stages:
+        return []
+    by_name = {s.name.strip().lower(): s for s in stages}
+    matched: dict[int, dict] = {}
+    for item in raw:
+        stage = by_name.get(str(item.get("etapa", "")).strip().lower())
+        if stage is None:
+            continue
+        matched[stage.id] = {
+            "stage_id": stage.id,
+            "verdict": item.get("veredito", "nao_avaliada"),
+            "rationale": item.get("justificativa"),
+        }
+    rows = [
+        matched.get(s.id, {"stage_id": s.id, "verdict": "nao_avaliada", "rationale": None})
+        for s in stages
+    ]
+    db.add_checkpoint_verdicts(conn, checkpoint.id, rows)
+    names = {s.id: s.name for s in stages}
+    return [
+        {
+            "stage_id": r["stage_id"],
+            "stage_name": names[r["stage_id"]],
+            "verdict": r["verdict"],
+            "label": db.VERDICT_LABELS[r["verdict"]],
+            "rationale": r["rationale"],
+        }
+        for r in rows
+    ]
 
 
 # --- Review -----------------------------------------------------------------
@@ -272,6 +411,56 @@ def _avg_lead_days(tasks: list[db.Task]) -> float | None:
     return round(sum(leads) / len(leads), 1) if leads else None
 
 
+def _run_change(
+    conn: sqlite3.Connection, tasks: list[db.Task], nature, start: str, end: str
+) -> dict:
+    """Divide o período entre operação (run) e entrega (change).
+
+    Tarefa sem projeto fica num balde `loose` próprio e FORA do share: ela não é
+    nem run nem change, e jogá-la em change inflaria o trabalho de projeto com
+    ruído não rastreado — justamente o número que vai para a conversa com o gestor.
+    """
+    buckets = {k: [] for k in ("run", "change", "loose")}
+    for t in tasks:
+        buckets[nature(t)].append(t)
+
+    def summarize(ts: list[db.Task]) -> dict:
+        return {
+            "total": len(ts),
+            "done": sum(1 for t in ts if t.status == "done"),
+            "overdue": sum(
+                1 for t in ts if t.status != "done" and t.due_date and t.due_date < end
+            ),
+            "avg_lead_days": _avg_lead_days([t for t in ts if t.status == "done"]),
+        }
+
+    attributed = len(buckets["run"]) + len(buckets["change"])
+    # O evento de SLA é o prazo do ciclo, não a abertura: a janela de N dias
+    # fatiaria o mês arbitrariamente se contasse pela data de início.
+    cycles = db.list_routine_runs_due_between(conn, start, end)
+    closed = [c for c in cycles if c.status == "done"]
+    with_date = [c for c in closed if c.done_at and c.deadline]
+    on_sla = [c for c in with_date if c.done_at[:10] <= c.deadline]
+    unknown = len(closed) - len(with_date)
+
+    return {
+        "run": summarize(buckets["run"]),
+        "change": summarize(buckets["change"]),
+        "loose": summarize(buckets["loose"]),
+        "attributed": attributed,
+        "run_share": _rate(len(buckets["run"]), attributed),
+        "change_share": _rate(len(buckets["change"]), attributed),
+        "cycles_total": len(cycles),
+        "cycles_closed": len(closed),
+        "cycles_on_sla": len(on_sla),
+        # Ciclos fechados antes da migração do done_at: contados à parte e fora
+        # do denominador, para não virarem "cumpriu o SLA" por omissão.
+        "cycles_unknown": unknown,
+        "cycles_sla_rate": _rate(len(on_sla), len(with_date)),
+        "stages_done": db.count_stages_done_between(conn, start, end),
+    }
+
+
 def review_metrics(conn: sqlite3.Connection, days: int = 14) -> dict:
     """Métricas de execução do período — só dados locais, sem LLM."""
     end = date.today()
@@ -287,13 +476,26 @@ def review_metrics(conn: sqlite3.Connection, days: int = 14) -> dict:
     same_day = [t for t in done if (t.done_at or "")[:10] == t.day]
     unplanned = [t for t in tasks if t.source != "plan"]
 
-    done_per_day = {
-        (start + timedelta(days=i)).isoformat(): 0 for i in range(days)
+    # kind=None: ciclos de rotina também precisam de nome e natureza nas métricas.
+    projects = db.list_projects(conn, include_done=True, kind=None)
+    project_names = {p.id: p.name for p in projects}
+    kind_by_project = {p.id: p.kind for p in projects}
+
+    def nature(t: db.Task) -> str:
+        """run = ciclo de rotina, change = projeto, loose = sem vínculo."""
+        if not t.project_id:
+            return "loose"
+        return "run" if kind_by_project.get(t.project_id) == "routine_run" else "change"
+
+    per_day = {
+        (start + timedelta(days=i)).isoformat(): {"done": 0, "run": 0, "change": 0, "loose": 0}
+        for i in range(days)
     }
     for t in done:
         d = (t.done_at or "")[:10]
-        if d in done_per_day:
-            done_per_day[d] += 1
+        if d in per_day:
+            per_day[d]["done"] += 1
+            per_day[d][nature(t)] += 1
 
     by_effort = {}
     for level in db.EFFORT_LEVELS:
@@ -326,13 +528,10 @@ def review_metrics(conn: sqlite3.Connection, days: int = 14) -> dict:
     for t in tasks:
         if t.project_id:
             grouped_by_project.setdefault(t.project_id, []).append(t)
-    # kind=None: ciclos de rotina também precisam de nome nas métricas.
-    project_names = {
-        p.id: p.name for p in db.list_projects(conn, include_done=True, kind=None)
-    }
     by_project = {
         str(pid): {
             "name": project_names.get(pid, f"Projeto #{pid}"),
+            "kind": kind_by_project.get(pid, "project"),
             "total": len(ts),
             "done": sum(1 for t in ts if t.status == "done"),
             "overdue": sum(
@@ -354,7 +553,8 @@ def review_metrics(conn: sqlite3.Connection, days: int = 14) -> dict:
         "unplanned_rate": _rate(len(unplanned), len(tasks)),
         "avg_lead_days": _avg_lead_days(done),
         "throughput_per_week": round(len(done) * 7 / days, 1),
-        "done_per_day": [{"day": d, "done": n} for d, n in done_per_day.items()],
+        "per_day": [{"day": d, **counts} for d, counts in per_day.items()],
+        "run_change": _run_change(conn, tasks, nature, start.isoformat(), today),
         "by_effort": by_effort,
         "by_tag": by_tag,
         "by_project": by_project,
@@ -377,6 +577,24 @@ def _metrics_context(m: dict) -> str:
         f"Lead time médio: {m['avg_lead_days'] if m['avg_lead_days'] is not None else 'sem dados'}"
         f" dias. Throughput: {m['throughput_per_week']} tarefas/semana.",
     ]
+    rc = m["run_change"]
+    if rc["attributed"]:
+        lines.append(
+            f"Operação x entrega: {_pct(rc['run_share'])} do trabalho com vínculo foi rotina"
+            f" ({rc['run']['total']} tarefas) e {_pct(rc['change_share'])} foi projeto"
+            f" ({rc['change']['total']} tarefas)."
+        )
+        if rc["loose"]["total"]:
+            lines.append(
+                f"Fora desse cálculo: {rc['loose']['total']} tarefas sem projeto nem ciclo."
+            )
+    if rc["cycles_closed"]:
+        lines.append(
+            f"Ciclos de rotina: {rc['cycles_closed']} fechados de {rc['cycles_total']} com prazo"
+            f" no período; {rc['cycles_on_sla']} dentro do SLA ({_pct(rc['cycles_sla_rate'])})."
+        )
+    if rc["stages_done"]:
+        lines.append(f"Etapas concluídas no período: {rc['stages_done']}.")
     if m["overdue"]:
         lines.append("Tarefas atrasadas:")
         lines.extend(f"- {t['title']} (prazo {t['due']})" for t in m["overdue"])

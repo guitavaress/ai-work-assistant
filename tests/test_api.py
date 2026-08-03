@@ -256,6 +256,7 @@ def test_checkpoint_saves_status_and_summary(client, conn, monkeypatch):
             "situacao": "Avançando bem.",
             "riscos": "Testes adiados.",
             "proximo_passo": ["Fechar auth", "Escrever testes"],
+            "vereditos": [],
             "status": "no rumo",
             "resumo": "No rumo — falta auth.",
         },
@@ -309,8 +310,10 @@ def test_review_metrics_endpoint(client, conn):
     assert body["carryover_rate"] == 0.0
     assert body["by_tag"]["dados"]["overdue"] == 1
     assert body["by_effort"]["P"]["done"] == 1
-    assert len(body["done_per_day"]) == 7
-    assert body["done_per_day"][-1] == {"day": db.today(), "done": 1}
+    assert len(body["per_day"]) == 7
+    assert body["per_day"][-1] == {
+        "day": db.today(), "done": 1, "run": 0, "change": 0, "loose": 1
+    }
 
 
 def test_review_assessment(client, conn, monkeypatch):
@@ -360,7 +363,7 @@ def _rotina(conn):
     O created_at é recuado de propósito: uma rotina criada depois da abertura do
     período não materializa o ciclo corrente (é o que `wa routine run` resolve).
     """
-    routine = db.add_routine(conn, "Janela de Comissões", "fechar no SLA", "monthly", 1, sla_days=4)
+    routine = db.add_routine(conn, "Janela de Comissões", "fechar no SLA", "monthly", 1, sla_days=5)
     db.replace_routine_steps(
         conn,
         routine.id,
@@ -422,3 +425,318 @@ def test_project_out_uses_canonical_progress(client, conn):
     db.complete_task(conn, a.id)
     state = client.get("/api/state").json()
     assert state["projects"][0]["tasks"] == {"total": 2, "done": 1}
+
+
+# --- Etapas e campos derivados no /api/state --------------------------------
+
+
+def _projeto_com_etapas(conn, today="2026-08-02"):
+    p = db.add_project(conn, "Migração Glue", "meta", deadline="2026-09-30")
+    a = db.add_stage(conn, p.id, "Extrair", deadline="2026-08-01", done_criteria="arquivo na landing")
+    b = db.add_stage(conn, p.id, "Reconciliar", deadline="2026-08-01", done_criteria="diferença < 0,01%")
+    db.add_stage(conn, p.id, "Publicar", deadline="2026-08-20")
+    db.complete_stage(conn, a.id)
+    return p, b
+
+
+def test_state_exposes_stages_with_derived_fields(client, conn):
+    p, atrasada = _projeto_com_etapas(conn)
+    db.add_task(conn, "uma", stage_id=atrasada.id)
+
+    proj = client.get("/api/state").json()["projects"][0]
+    assert proj["kind"] == "project"
+    assert proj["current_stage_id"] == atrasada.id
+    assert proj["stages_progress"] == {"total": 3, "done": 1, "overdue": 1}
+
+    etapas = {s["name"]: s for s in proj["stages"]}
+    assert etapas["Extrair"]["done"] is True
+    assert etapas["Extrair"]["overdue"] is False  # feita não conta como atrasada
+    assert etapas["Reconciliar"]["is_current"] is True
+    assert etapas["Reconciliar"]["overdue"] is True
+    assert etapas["Reconciliar"]["days_overdue"] >= 1
+    assert etapas["Reconciliar"]["done_criteria"] == "diferença < 0,01%"
+    assert etapas["Reconciliar"]["tasks"] == {"total": 1, "done": 0}
+    assert etapas["Publicar"]["is_current"] is False
+
+
+def test_state_task_carries_stage(client, conn):
+    p, etapa = _projeto_com_etapas(conn)
+    t = db.add_task(conn, "Investigar divergência", stage_id=etapa.id)
+    linha = next(x for x in client.get("/api/state").json()["tasks"] if x["id"] == t.id)
+    assert linha["stage_id"] == etapa.id
+    assert linha["stage_name"] == "Reconciliar"
+    assert linha["project_kind"] == "project"
+
+
+def test_state_stage_carries_last_verdict(client, conn):
+    p, etapa = _projeto_com_etapas(conn)
+    cp = db.add_checkpoint(conn, p.id, "relato", "avaliação")
+    db.add_checkpoint_verdicts(
+        conn, cp.id, [{"stage_id": etapa.id, "verdict": "nao_atende", "rationale": "sem batimento"}]
+    )
+    proj = client.get("/api/state").json()["projects"][0]
+    etapas = {s["name"]: s for s in proj["stages"]}
+    assert etapas["Reconciliar"]["verdict"]["verdict"] == "nao_atende"
+    assert etapas["Reconciliar"]["verdict"]["label"] == "não atende"
+    assert etapas["Reconciliar"]["verdict"]["rationale"] == "sem batimento"
+    assert etapas["Extrair"]["verdict"] is None
+
+
+def test_routine_run_carries_routine_vocabulary(client, conn):
+    _rotina(conn)
+    client.get("/api/state")  # materializa
+    ciclo = client.get("/api/state").json()["routine_runs"][0]
+
+    assert ciclo["kind"] == "routine_run"
+    assert ciclo["routine_name"] == "Janela de Comissões"
+    assert ciclo["period_label"] == f"ciclo {ciclo['period']}"
+    assert ciclo["cadence"] == "mensal"
+    assert ciclo["window_label"] == "01–05 de cada mês"
+    assert ciclo["open"] is True
+    assert ciclo["closed_on_time"] is None
+    assert isinstance(ciclo["sla_left_days"], int)
+    assert [s["name"] for s in ciclo["stages"]] == ["Extrair base", "Reconciliar"]
+
+
+def test_closed_cycle_reports_sla(client, conn):
+    _rotina(conn)
+    client.get("/api/state")
+    ciclo_db = db.list_projects(conn, kind="routine_run")[0]
+    db.complete_project(conn, ciclo_db.id, closed_on=ciclo_db.deadline)
+
+    ciclo = client.get("/api/state").json()["routine_runs"][0]
+    assert ciclo["open"] is False
+    assert ciclo["closed_on_time"] is True
+    assert ciclo["tag"] == "concluído"
+
+
+def test_cycle_closed_before_migration_has_unknown_sla(client, conn):
+    """done_at NULL é um terceiro estado — não vira 'fechado no prazo' por omissão."""
+    _rotina(conn)
+    client.get("/api/state")
+    ciclo_db = db.list_projects(conn, kind="routine_run")[0]
+    conn.execute("UPDATE projects SET status = 'done' WHERE id = ?", (ciclo_db.id,))
+    conn.commit()
+
+    ciclo = client.get("/api/state").json()["routine_runs"][0]
+    assert ciclo["open"] is False
+    assert ciclo["closed_on_time"] is None
+
+
+def test_state_does_not_do_n_plus_one_on_stages(client, conn, monkeypatch):
+    """Etapas e progresso vêm em agregados; a tela não pode custar uma query por etapa."""
+    for n in range(4):
+        p = db.add_project(conn, f"Projeto {n}", "meta")
+        for m in range(4):
+            db.add_stage(conn, p.id, f"Etapa {m}")
+
+    contador = {"n": 0}
+    original = db.connect
+
+    def contando(*args, **kwargs):
+        c = original(*args, **kwargs)
+        c.set_trace_callback(lambda _sql: contador.__setitem__("n", contador["n"] + 1))
+        return c
+
+    monkeypatch.setattr(db, "connect", contando)
+    client.get("/api/state")
+
+    # 4 projetos x 4 etapas = 16 etapas; uma query por etapa passaria de 60.
+    assert contador["n"] < 60, f"{contador['n']} statements — o N+1 voltou"
+
+
+def test_state_exposes_ritual_counts_and_routines(client, conn):
+    _rotina(conn)
+    state = client.get("/api/state").json()
+
+    assert state["counts"]["rotinas"] == 1
+    assert isinstance(state["ritual"], list)
+    assert len(state["ritual"]) <= 3
+
+    rotina = state["routines"][0]
+    assert rotina["name"] == "Janela de Comissões"
+    assert rotina["cadence"] == "mensal"
+    assert rotina["window_label"] == "01–05 de cada mês"
+    assert [s["name"] for s in rotina["steps"]] == ["Extrair base", "Reconciliar"]
+    assert rotina["sla_history"] == {"closed": 0, "on_time": 0, "rate": None}
+
+
+def test_routine_sla_history_ignores_cycles_without_done_at(client, conn):
+    _rotina(conn)
+    client.get("/api/state")
+    ciclo = db.list_projects(conn, kind="routine_run")[0]
+    conn.execute("UPDATE projects SET status = 'done' WHERE id = ?", (ciclo.id,))
+    conn.commit()
+
+    rotina = client.get("/api/state").json()["routines"][0]
+    assert rotina["sla_history"]["closed"] == 0  # fechado sem data fica fora do cálculo
+    assert rotina["sla_history"]["rate"] is None
+
+
+def test_edit_task_sets_stage(client, conn):
+    p, etapa = _projeto_com_etapas(conn)
+    task = db.add_task(conn, "Investigar divergência")
+    edited = client.post(
+        f"/api/tasks/{task.id}", json={"project_id": p.id, "stage_id": etapa.id}
+    ).json()
+    assert edited["stage_id"] == etapa.id
+    assert edited["stage_name"] == "Reconciliar"
+    assert edited["project_id"] == p.id
+
+
+def test_edit_task_stage_from_another_project_422(client, conn):
+    """Sem a guarda, a tarefa migraria em silêncio para o projeto da etapa."""
+    p, etapa = _projeto_com_etapas(conn)
+    outro = db.add_project(conn, "Outro", "meta")
+    task = db.add_task(conn, "x", project_id=outro.id)
+
+    resp = client.post(f"/api/tasks/{task.id}", json={"project_id": outro.id, "stage_id": etapa.id})
+    assert resp.status_code == 422
+    assert "não pertence" in resp.json()["detail"]
+    assert db.get_task(conn, task.id).project_id == outro.id
+
+
+def test_edit_task_changing_project_drops_the_stage(client, conn):
+    p, etapa = _projeto_com_etapas(conn)
+    outro = db.add_project(conn, "Outro", "meta")
+    task = db.add_task(conn, "x", stage_id=etapa.id)
+
+    edited = client.post(f"/api/tasks/{task.id}", json={"project_id": outro.id}).json()
+    assert edited["project_id"] == outro.id
+    assert edited["stage_id"] is None
+
+
+def test_edit_task_keeps_stage_when_resent(client, conn):
+    """Regressão: salvar o popover sem mexer no destino não pode apagar a etapa."""
+    p, etapa = _projeto_com_etapas(conn)
+    task = db.add_task(conn, "x", stage_id=etapa.id)
+
+    edited = client.post(
+        f"/api/tasks/{task.id}",
+        json={"project_id": p.id, "stage_id": etapa.id, "tags": ["dados"]},
+    ).json()
+    assert edited["stage_id"] == etapa.id
+    assert db.get_task(conn, task.id).stage_id == etapa.id
+
+
+# --- Criação de rotina pela web ---------------------------------------------
+
+
+_ROTINA_OK = {
+    "name": "Janela de Comissões",
+    "goal": "comissões conciliadas e comunicadas",
+    "cadence": "monthly",
+    "anchor": 1,
+    "sla_days": 5,
+    "steps": [
+        {"name": "Baixar arquivo", "done_criteria": "sem linhas rejeitadas", "offset_days": 0},
+        {"name": "Reconciliar", "done_criteria": "diferença < 0,01%", "offset_days": 1},
+    ],
+}
+
+
+def test_add_routine_creates_with_checklist(client, conn):
+    r = client.post("/api/routines", json=_ROTINA_OK)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["name"] == "Janela de Comissões"
+    assert body["cadence"] == "mensal"
+    assert body["window_label"] == "01–05 de cada mês"
+    assert [s["name"] for s in body["steps"]] == ["Baixar arquivo", "Reconciliar"]
+    assert body["steps"][1]["done_criteria"] == "diferença < 0,01%"
+    assert body["steps"][1]["offset_days"] == 1
+
+    rotina = db.list_routines(conn)[0]
+    assert rotina.sla_days == 5
+    assert len(db.list_routine_steps(conn, rotina.id)) == 2
+
+
+def test_add_routine_does_not_materialize_a_cycle(client, conn):
+    """O ciclo nasce quando a janela abrir — o botão dos moldes é a válvula."""
+    client.post("/api/routines", json=_ROTINA_OK)
+    assert db.list_projects(conn, kind="routine_run", include_done=True) == []
+
+
+def test_add_routine_validations(client):
+    def post(**over):
+        return client.post("/api/routines", json={**_ROTINA_OK, **over})
+
+    assert post(name="  ").status_code == 422
+    assert post(goal="").status_code == 422
+    assert "Preencha nome" in post(name="").json()["detail"]
+
+    sem_etapas = post(steps=[])
+    assert sem_etapas.status_code == 422
+    assert "ao menos uma etapa" in sem_etapas.json()["detail"]
+
+    sem_criterio = post(steps=[{"name": "X", "done_criteria": "   "}])
+    assert sem_criterio.status_code == 422
+    assert "critério de pronto" in sem_criterio.json()["detail"]
+
+    assert post(cadence="anual").status_code == 422
+    assert post(anchor=99).status_code == 422
+    assert post(sla_days=0).status_code == 422
+
+
+def test_add_routine_duplicate_name_422(client):
+    assert client.post("/api/routines", json=_ROTINA_OK).status_code == 200
+    dup = client.post("/api/routines", json=_ROTINA_OK)
+    assert dup.status_code == 422
+    assert "Já existe uma rotina" in dup.json()["detail"]
+
+
+def test_add_project_duplicate_name_422(client):
+    """Mesmo tratamento no projeto: antes o UNIQUE virava 500."""
+    body = {"name": "API v2", "goal": "meta"}
+    assert client.post("/api/projects", json=body).status_code == 200
+    dup = client.post("/api/projects", json=body)
+    assert dup.status_code == 422
+    assert "Já existe um projeto" in dup.json()["detail"]
+
+
+def test_routine_preview(client):
+    r = client.get("/api/routines/preview", params={"cadence": "monthly", "anchor": 1, "sla_days": 5})
+    assert r.json()["window_label"] == "01–05 de cada mês"
+    assert r.json()["cadence"] == "mensal"
+
+    diaria = client.get("/api/routines/preview", params={"cadence": "daily", "anchor": 0, "sla_days": 1})
+    assert diaria.json()["window_label"] == "todo dia útil"
+
+    tri = client.get("/api/routines/preview", params={"cadence": "quarterly", "anchor": 1, "sla_days": 10})
+    assert tri.json()["window_label"] == "dia 01 do 1º mês + 9d de cada trimestre"
+    assert tri.json()["cadence"] == "trimestral"
+
+
+def test_routine_preview_invalid_422(client):
+    r = client.get("/api/routines/preview", params={"cadence": "anual", "anchor": 1, "sla_days": 1})
+    assert r.status_code == 422
+    assert "Cadência inválida" in r.json()["detail"]
+
+
+def test_run_routine_materializes_and_is_idempotent(client, conn):
+    rotina = client.post("/api/routines", json=_ROTINA_OK).json()
+    periodo = db.today()[:7]
+
+    r = client.post(f"/api/routines/{rotina['id']}/run", json={"period": periodo})
+    assert r.status_code == 200
+    ciclo = r.json()
+    assert ciclo["period"] == periodo
+    assert ciclo["open"] is True
+    assert [s["name"] for s in ciclo["stages"]] == ["Baixar arquivo", "Reconciliar"]
+
+    de_novo = client.post(f"/api/routines/{rotina['id']}/run", json={"period": periodo})
+    assert de_novo.json()["id"] == ciclo["id"]
+    assert len(db.list_projects(conn, kind="routine_run", include_done=True)) == 1
+
+
+def test_run_routine_defaults_to_the_current_period(client):
+    rotina = client.post("/api/routines", json=_ROTINA_OK).json()
+    ciclo = client.post(f"/api/routines/{rotina['id']}/run", json={}).json()
+    assert ciclo["period"] == db.today()[:7]
+
+
+def test_run_routine_missing_404_and_bad_period_422(client):
+    assert client.post("/api/routines/999/run", json={}).status_code == 404
+    rotina = client.post("/api/routines", json=_ROTINA_OK).json()
+    ruim = client.post(f"/api/routines/{rotina['id']}/run", json={"period": "agosto"})
+    assert ruim.status_code == 422

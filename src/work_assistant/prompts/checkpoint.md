@@ -7,6 +7,7 @@ A resposta é um JSON com estes campos, todos em português do Brasil:
 - `proximo_passo`: lista de 1–3 ações concretas até o próximo checkpoint, ordenadas por impacto na entrega.
 - `status`: o veredito em uma palavra-chave — "no rumo", "em risco" ou "desviando".
 - `resumo`: 1 frase curta (máx. ~15 palavras) resumindo o estado do projeto, começando pelo veredito (ex.: "Em risco — dependência do time de infra parada há uma semana.").
+- `vereditos`: uma entrada por etapa listada no contexto, com `etapa` (o nome exato como aparece na lista), `veredito` e `justificativa` de uma frase. Use `atende` só quando o relato evidencia que o critério de pronto foi verificado; `nao_atende` quando o critério existe e o relato mostra que ele não foi cumprido ou não foi checado; `nao_avaliada` quando o relato não fala da etapa ou ela depende de uma anterior. Se o projeto não tem etapas, devolva lista vazia.
 
 Regras:
 - Seja direto e específico ao relato — nada de conselhos genéricos.

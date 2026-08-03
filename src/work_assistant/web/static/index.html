@@ -5,16 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>wa_ — assistente de trabalho</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232E6B4F'/%3E%3Ctext x='24' y='45' font-family='ui-monospace,Menlo,Consolas,monospace' font-size='30' font-weight='600' fill='%23FFFFFF' text-anchor='middle'%3Ewa%3C/text%3E%3Crect x='44' y='39' width='12' height='6' rx='2' fill='%23A8D5BC'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 body {
-  margin: 0; font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  margin: 0; font-family: var(--font-sans);
   background: var(--bg); color: var(--ink);
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
   --bg:#F7F5F0; --card:#FFFFFF; --border:#E5E1D8; --line:#F0EDE5; --ink:#1C1B18;
   --dim:#6E6A5F; --faint:#B9B4A6; --accent:#2E6B4F; --accent-ink:#FFFFFF;
   --accent-soft:#EDF3EE; --accent-border:#CFE0D4; --accent-text:#2A4A3A;
   --amber:#B07A16; --amber-bg:#F5EAD0; --warn:#C2542E; --warn-bg:#F6E1D8;
+  --cycle:#2F5D6B; --cycle-soft:#E8F0F2; --cycle-border:#C6DBE0; --cycle-text:#274C57;
+  --cycle-ink:#FFFFFF;
   --chip:#EFECE3; --p1bg:#F6E8DE; --p1ink:#8A4B2D; --btn:#F3F0E9;
   --ok:#3E9B6B; --overlay:rgba(20,19,16,0.45); --shadow:rgba(28,27,24,0.08);
   --pc0bg:#F6E8DE; --pc0ink:#8A4B2D; --pc1bg:#E3EDF7; --pc1ink:#2D5C8A;
@@ -26,6 +28,8 @@ body.dark {
   --dim:#A8A296; --faint:#6E6A5F; --accent:#4E9C74; --accent-ink:#0E1F17;
   --accent-soft:#1E2A23; --accent-border:#2E4A3B; --accent-text:#A8D5BC;
   --amber:#D9AB4E; --amber-bg:#3A311C; --warn:#E07B52; --warn-bg:#3A2417;
+  --cycle:#77B2C1; --cycle-soft:#1B2A2F; --cycle-border:#31505A; --cycle-text:#A9CFD9;
+  --cycle-ink:#10231A;
   --chip:#2A2822; --p1bg:#3A2417; --p1ink:#E5A583; --btn:#262420;
   --ok:#4FBF85; --overlay:rgba(0,0,0,0.55); --shadow:rgba(0,0,0,0.35);
   --pc0bg:#3A2417; --pc0ink:#E5A583; --pc1bg:#1E2E3D; --pc1ink:#8FBBDD;
@@ -36,7 +40,7 @@ a { color: var(--accent); } a:hover { opacity: 0.8; }
 input, textarea, button, select { font-family: inherit; }
 input::placeholder, textarea::placeholder { color: var(--faint); }
 @keyframes spin { to { transform: rotate(360deg); } }
-.mono { font-family: 'JetBrains Mono', monospace; }
+.mono { font-family: var(--font-mono); }
 
 .shell { min-height: 100vh; display: flex; flex-direction: column; }
 .topbar {
@@ -45,7 +49,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   position: sticky; top: 0; background: var(--bg); z-index: 10;
 }
 .topbar-left { display: flex; align-items: center; gap: 24px; }
-.brand { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 16px; }
+.brand { font-family: var(--font-mono); font-weight: 600; font-size: 16px; }
 .brand span { color: var(--accent); }
 .nav { display: flex; gap: 4px; }
 .nav button {
@@ -54,10 +58,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .nav button.active { background: var(--chip); color: var(--ink); font-weight: 600; }
 .topbar-right { display: flex; align-items: center; gap: 14px; }
-.daynav { display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--dim); }
+.daynav { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 13px; color: var(--dim); }
 .daynav button { border: 1px solid var(--border); background: var(--card); color: var(--dim); border-radius: 6px; width: 26px; height: 26px; cursor: pointer; }
 .daynav .lbl { padding: 0 6px; min-width: 66px; text-align: center; }
-.server { display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); }
+.server { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
 .server .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; }
 .server.off .dot { background: var(--warn); }
 .icon-btn {
@@ -68,7 +72,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .container { flex: 1; width: 100%; max-width: 1160px; margin: 0 auto; padding: 32px 32px 72px; box-sizing: border-box; }
 .view { display: none; }
 .view.active { display: block; }
-.kicker { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--dim); }
+.kicker { font-family: var(--font-mono); font-size: 13px; color: var(--dim); }
 .h-lg { font-size: 30px; font-weight: 600; letter-spacing: -0.4px; margin-top: 2px; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; }
 
@@ -76,7 +80,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .col { display: flex; flex-direction: column; gap: 16px; }
 .col-head { display: flex; justify-content: space-between; align-items: baseline; }
 .col-title { font-size: 26px; font-weight: 600; letter-spacing: -0.4px; margin-top: 2px; }
-.col-count { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); }
+.col-count { font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
 @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } .tables { grid-template-columns: 1fr !important; } .mgrid { grid-template-columns: repeat(2, 1fr) !important; } }
 
 .btn-primary { background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
@@ -101,16 +105,16 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 .tcheck.checked { border-color: var(--accent); background: var(--accent); }
 .tcheck.act { cursor: pointer; }
-.tprio { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--dim); background: var(--chip); padding: 2px 7px; border-radius: 5px; margin-top: 1px; }
+.tprio { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--dim); background: var(--chip); padding: 2px 7px; border-radius: 5px; margin-top: 1px; }
 .tprio.p1 { color: var(--p1ink); background: var(--p1bg); }
 .tmain { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .ttitle { font-size: 15px; }
 .ttitle.done { text-decoration: line-through; }
 .tmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
-.m-eff { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; color: var(--dim); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
-.m-proj { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--faint); }
-.m-tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent-text); background: var(--accent-soft); border-radius: 5px; padding: 1px 7px; }
-.m-due { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim); background: var(--chip); border-radius: 5px; padding: 1px 7px; }
+.m-eff { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; color: var(--dim); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
+.m-proj { font-family: var(--font-mono); font-size: 11px; color: var(--faint); }
+.m-tag { font-family: var(--font-mono); font-size: 11px; color: var(--accent-text); background: var(--accent-soft); border-radius: 5px; padding: 1px 7px; }
+.m-due { font-family: var(--font-mono); font-size: 11px; color: var(--dim); background: var(--chip); border-radius: 5px; padding: 1px 7px; }
 .m-due.late { color: var(--warn); background: var(--warn-bg); }
 .addbar { padding: 13px 22px; border-top: 1px solid var(--line); margin-top: -1px; }
 .addbar input { width: 100%; border: none; background: transparent; font-size: 15px; color: var(--ink); outline: none; box-sizing: border-box; }
@@ -129,20 +133,112 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .pbar-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .pbar { flex: 1; height: 5px; background: var(--chip); border-radius: 999px; overflow: hidden; }
 .pbar-fill { height: 100%; background: var(--accent); }
-.pmini-prog { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--faint); white-space: nowrap; }
-.pmini-dl { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim); margin-top: 8px; }
+.pmini-prog { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); white-space: nowrap; }
+.pmini-dl { font-family: var(--font-mono); font-size: 11px; color: var(--dim); margin-top: 8px; }
 
-.sbadge { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim); background: var(--chip); padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
+.sbadge { font-family: var(--font-mono); font-size: 11px; color: var(--dim); background: var(--chip); padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
 .sbadge.ok { color: var(--accent); background: var(--accent-soft); }
 .sbadge.risk { color: var(--warn); background: var(--warn-bg); }
 .proj-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
-.proj-chip { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 5px; white-space: nowrap; background: var(--chip); color: var(--dim); }
+.proj-chip { font-family: var(--font-mono); font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 5px; white-space: nowrap; background: var(--chip); color: var(--dim); }
 .proj-chip.c0 { background: var(--pc0bg); color: var(--pc0ink); } .proj-dot.c0 { background: var(--pc0ink); }
 .proj-chip.c1 { background: var(--pc1bg); color: var(--pc1ink); } .proj-dot.c1 { background: var(--pc1ink); }
 .proj-chip.c2 { background: var(--pc2bg); color: var(--pc2ink); } .proj-dot.c2 { background: var(--pc2ink); }
 .proj-chip.c3 { background: var(--pc3bg); color: var(--pc3ink); } .proj-dot.c3 { background: var(--pc3ink); }
 .proj-chip.c4 { background: var(--pc4bg); color: var(--pc4ink); } .proj-dot.c4 { background: var(--pc4ink); }
 .proj-chip.c5 { background: var(--pc5bg); color: var(--pc5ink); } .proj-dot.c5 { background: var(--pc5ink); }
+
+/* Ciclos de rotina — superfície própria para não se confundir com projeto */
+.ccard { background: var(--cycle-soft); border: 1px solid var(--cycle-border); border-radius: 14px; padding: 20px 24px; }
+.ccard.done { background: var(--card); border-color: var(--border); }
+.ckicker { font-family: var(--font-mono); font-size: 12px; color: var(--cycle); text-transform: uppercase; letter-spacing: 0.6px; display: flex; align-items: center; gap: 7px; }
+.ccard.done .ckicker { color: var(--faint); }
+.cname { font-size: 18px; font-weight: 600; margin-top: 3px; }
+.cgoal { font-size: 14px; color: var(--dim); margin-top: 3px; }
+.cmeta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
+.sla { font-weight: 600; color: var(--dim); }
+.sla.soon { color: var(--amber); }
+.sla.warn { color: var(--warn); }
+
+/* Etapas: tira de segmentos (sempre visível) + linha de situação */
+.sseg-row { display: flex; gap: 3px; margin-top: 14px; }
+.sseg { flex: 1; height: 6px; border-radius: 999px; background: var(--chip); }
+.sseg-done { background: var(--accent); }
+.sseg-cur { background: var(--accent-border); }
+.sseg-late { background: var(--amber); }
+/* Só a etapa corrente E atrasada usa vermelho: com 3 ciclos abertos, no
+   máximo 3 marcas vermelhas na tela. */
+.sseg-late.sseg-cur { background: var(--warn); }
+.sline { font-family: var(--font-mono); font-size: 12px; color: var(--dim); margin-top: 9px; }
+.sline.today { color: var(--amber); }
+.sline.late { color: var(--warn); }
+.scrit { font-size: 13px; color: var(--dim); margin-top: 8px; line-height: 1.45; }
+.scrit-kick { font-family: var(--font-mono); font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 6px; }
+
+/* Etapas: lista completa (só ao expandir) */
+.strow { display: flex; gap: 11px; padding: 11px 14px; border-top: 1px solid var(--line); }
+.strow-cur { background: var(--bg); }
+.stbox { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--faint); flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--accent-ink); }
+.stbox.done { background: var(--accent); border-color: var(--accent); }
+.stbox.late { border-color: var(--warn); }
+.stname { font-size: 13.5px; }
+.strow-cur .stname { font-weight: 600; }
+.stname.done { text-decoration: line-through; color: var(--dim); }
+.stdue { font-family: var(--font-mono); font-size: 11px; padding: 1px 7px; border-radius: 4px; background: var(--chip); color: var(--dim); white-space: nowrap; }
+.stdue.today { background: var(--amber-bg); color: var(--amber); }
+.stdue.late { background: var(--warn-bg); color: var(--warn); }
+
+/* Veredito do modelo por etapa */
+.verdict { font-family: var(--font-mono); font-size: 10.5px; padding: 1px 7px; border-radius: 4px; background: var(--chip); color: var(--dim); white-space: nowrap; }
+.verdict.ok { background: var(--accent-soft); color: var(--accent); }
+.verdict.no { background: var(--warn-bg); color: var(--warn); }
+.verdict-why { font-size: 12.5px; color: var(--dim); margin-top: 5px; line-height: 1.45; }
+
+/* Ritual do dia */
+.ritual { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.ritual-item { display: flex; align-items: baseline; gap: 8px; }
+.ritual-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--faint); }
+.ritual-now .ritual-dot { background: var(--warn); }
+.ritual-open .ritual-dot { background: var(--amber); }
+.ritual-calm .ritual-dot { background: var(--faint); }
+.ritual-text { font-size: 13.5px; line-height: 1.4; }
+.ritual-detail { font-size: 12.5px; color: var(--dim); }
+.ritual-empty { font-size: 13px; color: var(--dim); margin-top: 10px; }
+
+/* Análise: onde seu tempo foi (rotina x projeto) */
+.split-head { font-size: 36px; font-weight: 600; letter-spacing: -0.8px; color: var(--cycle); }
+.split { display: flex; gap: 4px; margin-top: 18px; }
+.split-run { background: var(--cycle); height: 14px; border-radius: 999px; }
+.split-change { background: var(--accent); height: 14px; border-radius: 999px; }
+.split-legend { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 14px; font-family: var(--font-mono); font-size: 12px; }
+.split-legend .run { color: var(--cycle); }
+.split-legend .change { color: var(--accent); }
+.split-note { font-size: 13.5px; color: var(--dim); margin-top: 14px; line-height: 1.5; max-width: 640px; }
+.navcount { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; color: var(--cycle); background: var(--cycle-soft); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+.sect-title { font-family: var(--font-mono); font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.6px; }
+
+/* Formulário de nova rotina */
+.nrform { background: var(--card); border: 1px solid var(--cycle-border); border-radius: 14px; padding: 22px 24px; display: flex; flex-direction: column; gap: 16px; }
+.nrgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.nrgrid3 { display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: 12px; align-items: end; }
+.nrfield { display: flex; flex-direction: column; gap: 5px; }
+.nrfield > span { font-size: 12px; color: var(--dim); }
+.nrfield input { border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 9px 11px; font-size: 14px; }
+.cadrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.cadbtn { border: 1px solid var(--border); background: var(--card); color: var(--dim); border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+.cadbtn.on { border-color: var(--cycle); background: var(--cycle); color: var(--cycle-ink); }
+.nrprev { font-family: var(--font-mono); font-size: 12px; color: var(--cycle-text); background: var(--cycle-soft); border: 1px solid var(--cycle-border); border-radius: 8px; padding: 9px 11px; }
+.nslist { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.nsrow { display: grid; grid-template-columns: 1.1fr 1.5fr 92px auto; gap: 8px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--line); }
+.nsrow input { border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; font-size: 13px; width: 100%; box-sizing: border-box; }
+.nsitem { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-top: 1px solid var(--line); }
+.nspos { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--cycle); margin-top: 2px; }
+.nsact { border: none; background: transparent; color: var(--faint); font-size: 14px; cursor: pointer; padding: 0 4px; }
+.nsact:hover { color: var(--ink); }
+.nrfoot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.nrhint { font-size: 12.5px; color: var(--dim); }
+.btn-cycle { background: var(--cycle); color: var(--cycle-ink); border: none; border-radius: 8px; padding: 9px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.btn-cycle-soft { border: 1px solid var(--cycle-border); background: var(--cycle-soft); color: var(--cycle-text); border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
 
 /* Projetos view */
 .stackv { display: flex; flex-direction: column; gap: 22px; }
@@ -151,7 +247,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .pcard-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .pcard-name { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 9px; }
 .pcard-goal { font-size: 14px; color: var(--dim); margin-top: 4px; }
-.pcard-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); }
+.pcard-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
 .pcard-actions { display: flex; gap: 8px; margin-top: 16px; }
 .ptl { margin-top: 18px; display: flex; flex-direction: column; }
 .ptl-item { display: flex; gap: 12px; }
@@ -163,7 +259,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .ptl-body { padding-bottom: 16px; }
 .ptl-body.end { padding-bottom: 0; }
 .ptl-top { display: flex; align-items: center; gap: 8px; }
-.ptl-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--faint); }
+.ptl-date { font-family: var(--font-mono); font-size: 11px; color: var(--faint); }
 .ptl-sum { font-size: 13.5px; color: var(--dim); margin-top: 3px; max-width: 520px; }
 .np-form { background: var(--card); border: 1px solid var(--accent-border); border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
 .np-form input { border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 10px 14px; font-size: 14px; outline: none; box-sizing: border-box; }
@@ -176,7 +272,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .bubble { max-width: 78%; padding: 12px 16px; font-size: 14.5px; line-height: 1.55; white-space: pre-wrap; }
 .bubble.user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 14px 14px 4px 14px; }
 .bubble.bot { align-self: flex-start; background: var(--card); color: var(--ink); border: 1px solid var(--border); border-radius: 14px 14px 14px 4px; }
-.bubble code, .block-body code, .ablock-body code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; background: var(--chip); border-radius: 4px; padding: 1px 5px; }
+.bubble code, .block-body code, .ablock-body code { font-family: var(--font-mono); font-size: 12.5px; background: var(--chip); border-radius: 4px; padding: 1px 5px; }
 .bubble code.blk { display: block; padding: 8px 10px; margin: 4px 0; white-space: pre-wrap; overflow-x: auto; }
 .thinking { align-self: flex-start; display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 13px; padding: 6px 2px; }
 .spinner { width: 14px; height: 14px; border: 2px solid var(--chip); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite; }
@@ -190,7 +286,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 /* Análise */
 .seg { display: flex; gap: 4px; background: var(--chip); border-radius: 8px; padding: 3px; }
-.seg button { border: none; background: transparent; color: var(--dim); border-radius: 6px; padding: 6px 12px; font-size: 13px; font-family: 'JetBrains Mono', monospace; cursor: pointer; }
+.seg button { border: none; background: transparent; color: var(--dim); border-radius: 6px; padding: 6px 12px; font-size: 13px; font-family: var(--font-mono); cursor: pointer; }
 .seg button.active { background: var(--card); color: var(--ink); }
 .mgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .mcard { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
@@ -200,11 +296,11 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .spark { display: flex; align-items: flex-end; gap: 5px; height: 96px; }
 .spark-col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 5px; }
 .spark-bar { width: 100%; min-height: 3px; border-radius: 3px; }
-.spark-tick { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--faint); }
+.spark-tick { font-family: var(--font-mono); font-size: 9px; color: var(--faint); }
 .tables { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .rtable { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 22px; }
 .rtable-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
-.rt-head { display: flex; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--faint); padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.rt-head { display: flex; font-family: var(--font-mono); font-size: 11px; color: var(--faint); padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .rt-row { display: flex; align-items: center; font-size: 13.5px; padding: 9px 0; border-top: 1px solid var(--line); margin-top: -1px; }
 .rt-row:first-of-type { border-top: none; }
 .assess-panel { background: var(--accent-soft); border: 1px solid var(--accent-border); border-radius: 14px; padding: 22px 24px; }
@@ -227,7 +323,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .suggest-list { display: flex; flex-direction: column; margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .suggest-item { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border-top: 1px solid var(--line); margin-top: -1px; }
 .suggest-item:first-child { border-top: none; margin-top: 0; }
-.suggest-item .num { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--accent); width: 18px; margin-top: 1px; }
+.suggest-item .num { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--accent); width: 18px; margin-top: 1px; }
 .pick-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 .pick-list button { text-align: left; border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 10px; padding: 13px 16px; font-size: 14.5px; cursor: pointer; }
 .pick-list .p-name { font-weight: 600; }
@@ -236,9 +332,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .block-title { font-size: 13px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.4px; }
 .block-body { font-size: 14.5px; line-height: 1.55; color: var(--ink); margin-top: 4px; white-space: pre-line; }
 .modal-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
-.saved-note { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--faint); }
+.saved-note { font-family: var(--font-mono); font-size: 12px; color: var(--faint); }
 .efield { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
-.efield label { font-size: 12.5px; color: var(--dim); font-family: 'JetBrains Mono', monospace; }
+.efield label { font-size: 12.5px; color: var(--dim); font-family: var(--font-mono); }
 .efield input, .efield select { border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 9px 12px; font-size: 14px; outline: none; box-sizing: border-box; }
 .efield-row { display: flex; gap: 12px; margin-top: 14px; }
 .efield-row .efield { flex: 1; margin-top: 0; }
@@ -263,6 +359,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   <div class="container">
     <div class="view" id="view-hoje"></div>
     <div class="view" id="view-projetos"></div>
+    <div class="view" id="view-rotinas"></div>
     <div class="view" id="view-chat"></div>
     <div class="view" id="view-rev"></div>
     <div class="view" id="view-hist"></div>
@@ -285,8 +382,13 @@ const S = {
   modal: null,
   plan: { stage: 'input', text: '', suggested: [] },
   cp: { stage: 'pick', projectId: null, text: '', blocks: [], status: '', name: '', goal: '' },
-  su: { stage: 'thinking', blocks: [], copied: false },
   np: { open: false, name: '', goal: '' },
+  openStages: {},
+  routines: [], ritual: [], counts: {},
+  // Só o que é estrutural mora aqui; o texto dos campos fica no DOM e é lido
+  // sob demanda (mesmo padrão do formulário de novo projeto). Guardar texto no
+  // estado exigiria re-render por tecla, e re-render tira o foco do input.
+  nr: { open: false, cadence: 'monthly', anchor: 1, sla: 5, stages: [], preview: '' },
   edit: { id: null, project_id: '', tags: '', due: '', effort: '' },
 };
 const OFFLINE_MSG = 'Servidor offline — suba o llama.cpp com docker compose up -d';
@@ -359,6 +461,9 @@ async function loadState() {
   S.tasks = st.tasks;
   S.projects = st.projects;
   S.routine_runs = st.routine_runs || [];
+  S.routines = st.routines || [];
+  S.ritual = st.ritual || [];
+  S.counts = st.counts || {};
   if (!S.viewDay) S.viewDay = st.today;
   if (!S.histDay) S.histDay = st.today;
   render();
@@ -394,11 +499,12 @@ function render() {
   renderServer();
   renderDaynav();
   renderFab();
-  for (const v of ['hoje', 'projetos', 'chat', 'rev', 'hist']) {
+  for (const v of ['hoje', 'projetos', 'rotinas', 'chat', 'rev', 'hist']) {
     document.getElementById('view-' + v).classList.toggle('active', S.view === v);
   }
   if (S.view === 'hoje') renderHoje();
   if (S.view === 'projetos') renderProjetos();
+  if (S.view === 'rotinas') renderRotinas();
   if (S.view === 'chat') renderChat();
   if (S.view === 'rev') renderRev();
   if (S.view === 'hist') renderHist();
@@ -412,10 +518,14 @@ function go(view) {
   render();
 }
 function renderNav() {
-  const items = [['Hoje', 'hoje'], ['Projetos', 'projetos'], ['Análise', 'rev'], ['Chat', 'chat'], ['Histórico', 'hist']];
-  document.getElementById('nav').innerHTML = items.map(([label, key]) =>
-    '<button class="' + (S.view === key ? 'active' : '') + '" onclick="go(\'' + key + '\')">' + label + '</button>'
-  ).join('');
+  const items = [['Hoje', 'hoje'], ['Projetos', 'projetos'], ['Rotinas', 'rotinas'],
+                 ['Análise', 'rev'], ['Chat', 'chat'], ['Histórico', 'hist']];
+  document.getElementById('nav').innerHTML = items.map(([label, key]) => {
+    // Só Rotinas tem contador, e é a contagem de ciclos abertos.
+    const n = key === 'rotinas' ? (S.counts.rotinas || 0) : 0;
+    return '<button class="' + (S.view === key ? 'active' : '') + '" onclick="go(\'' + key + '\')">'
+      + label + (n ? '<span class="navcount">' + n + '</span>' : '') + '</button>';
+  }).join('');
 }
 function renderServer() {
   document.getElementById('server').classList.toggle('off', !S.online);
@@ -457,15 +567,116 @@ function taskRow(t, opts) {
     + '</div></div>';
 }
 
+// --- Etapas ----------------------------------------------------------------
+// O servidor já manda `overdue`, `days_overdue` e `is_current` calculados contra
+// o `db.today()` dele. Aqui é só apresentação — nada de refazer conta de data,
+// senão o relógio do navegador discordaria do que a CLI imprime.
+
+function entityKey(e) { return (e.kind === 'routine_run' ? 'r' : 'p') + e.id; }
+
+function stageSegments(e) {
+  if (!e.stages || !e.stages.length) return '';
+  return '<div class="sseg-row">' + e.stages.map(s => {
+    let cls = 'sseg';
+    if (s.done) cls += ' sseg-done';
+    else {
+      if (s.overdue) cls += ' sseg-late';
+      if (s.is_current) cls += ' sseg-cur';
+    }
+    const est = s.done ? ' — fechada' : (s.overdue ? ' — atrasada' : '');
+    return '<div class="' + cls + '" title="' + esc(s.name + est) + '"></div>';
+  }).join('') + '</div>';
+}
+
+function stageLine(e) {
+  const st = e.stages || [];
+  if (!st.length) return '<div class="sline">sem etapas · ' + e.tasks.done + '/' + e.tasks.total + ' tarefas</div>';
+  const cur = st.find(s => s.is_current);
+  if (!cur) return '<div class="sline">todas as ' + st.length + ' etapas fechadas</div>';
+
+  let txt = 'etapa ' + cur.position + '/' + st.length + ' · ' + cur.name;
+  let cls = 'sline';
+  if (cur.overdue) {
+    txt += ' · venceu ' + (cur.days_overdue === 1 ? 'ontem' : 'há ' + cur.days_overdue + ' dias');
+    cls += ' late';
+  } else if (cur.deadline === S.today) {
+    txt += ' · prazo hoje';
+    cls += ' today';
+  } else if (cur.deadline) {
+    txt += ' · até ' + fmtShort(cur.deadline);
+  }
+  // Atrasadas que não são a corrente viram sufixo discreto, não segunda marca vermelha.
+  const extra = e.stages_progress.overdue - (cur.overdue ? 1 : 0);
+  if (extra > 0) txt += ' (+' + extra + ' atrasada' + (extra > 1 ? 's' : '') + ')';
+  return '<div class="' + cls + '">' + esc(txt) + '</div>';
+}
+
+function currentCriteria(e) {
+  const cur = (e.stages || []).find(s => s.is_current);
+  if (!cur || !cur.done_criteria) return '';
+  return '<div class="scrit"><span class="scrit-kick">pronto quando</span>' + esc(cur.done_criteria) + '</div>';
+}
+
+function stageRows(e) {
+  return '<div style="margin-top:12px;">' + e.stages.map(s => {
+    let box = 'stbox';
+    if (s.done) box += ' done';
+    else if (s.overdue) box += ' late';
+    let due = '';
+    if (s.deadline) {
+      const late = s.overdue, hoje = s.deadline === S.today;
+      const rot = late ? '⚠ venceu ' + fmtShort(s.deadline) : (hoje ? 'prazo hoje' : 'até ' + fmtShort(s.deadline));
+      due = '<span class="stdue' + (late ? ' late' : (hoje ? ' today' : '')) + '">' + esc(rot) + '</span>';
+    }
+    const v = s.verdict
+      ? '<span class="verdict ' + (s.verdict.verdict === 'atende' ? 'ok' : (s.verdict.verdict === 'nao_atende' ? 'no' : '')) + '">' + esc(s.verdict.label) + '</span>'
+      : '';
+    return '<div class="strow' + (s.is_current ? ' strow-cur' : '') + '">'
+      + '<span class="' + box + '">' + (s.done ? '✓' : '') + '</span>'
+      + '<div style="flex:1; min-width:0;">'
+      + '<div style="display:flex; flex-wrap:wrap; align-items:baseline; gap:9px;">'
+      + '<span class="stname' + (s.done ? ' done' : '') + '">' + esc(s.name) + '</span>'
+      + due + v
+      + '<span class="pmini-prog">' + s.tasks.done + '/' + s.tasks.total + ' tarefas</span></div>'
+      + (s.done_criteria ? '<div class="scrit" style="margin-top:5px;"><span class="scrit-kick">pronto quando</span>' + esc(s.done_criteria) + '</div>' : '')
+      + (s.verdict && s.verdict.rationale ? '<div class="verdict-why">' + esc(s.verdict.rationale) + '</div>' : '')
+      + '</div></div>';
+  }).join('') + '</div>';
+}
+
+function stageToggle(e) {
+  if (!e.stages || !e.stages.length) return '';
+  const key = entityKey(e), open = !!S.openStages[key];
+  return '<button class="btn-link" style="margin-top:10px;" onclick="toggleStages(\'' + key + '\')">'
+    + (open ? 'ocultar etapas' : 'ver as ' + e.stages.length + ' etapas') + '</button>'
+    + (open ? stageRows(e) : '');
+}
+
+function toggleStages(key) {
+  S.openStages[key] = !S.openStages[key];
+  render();
+}
+
+function stageBar(e) {
+  // Com etapas, a barra passa a medir etapa fechada; tarefa vira dado secundário.
+  const sp = e.stages_progress;
+  const useStages = sp && sp.total;
+  const done = useStages ? sp.done : e.tasks.done;
+  const total = useStages ? sp.total : e.tasks.total;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  return '<div class="pbar-row"><div class="pbar"><div class="pbar-fill" style="width:' + pct + '%"></div></div>'
+    + '<span class="pmini-prog">' + done + '/' + total + (useStages ? ' etapas' : '') + '</span></div>';
+}
+
 function projMini(p) {
-  const pctv = p.tasks.total ? Math.round(p.tasks.done / p.tasks.total * 100) : 0;
   const late = p.deadline && p.active && p.deadline < S.today;
   return '<div class="pmini">'
     + '<div class="pmini-head"><span class="pmini-name">'
     + '<span class="proj-dot ' + projClass(p.id) + '"></span><span class="txt">' + esc(p.name) + '</span></span>'
     + '<span class="' + statusCls(p.tag) + '">' + esc(p.tag) + '</span></div>'
-    + '<div class="pbar-row"><div class="pbar"><div class="pbar-fill" style="width:' + pctv + '%"></div></div>'
-    + '<span class="pmini-prog">' + p.tasks.done + '/' + p.tasks.total + '</span></div>'
+    + stageSegments(p)
+    + stageBar(p)
+    + (p.stages.length ? stageLine(p) : '')
     + (p.deadline ? '<div class="pmini-dl" style="' + (late ? 'color:var(--warn);' : '') + '">entrega: ' + fmtShort(p.deadline) + (late ? ' • vencido' : '') + '</div>' : '')
     + '</div>';
 }
@@ -496,14 +707,40 @@ function renderHoje() {
 
   // Coluna direita: sidebar
   html += '<div class="col">';
+  const ciclos = S.routine_runs.filter(c => c.open);
+  if (ciclos.length) {
+    html += '<div class="scard" style="background:var(--cycle-soft); border-color:var(--cycle-border);">'
+      + '<div class="scard-head"><div class="scard-title" style="color:var(--cycle-text);">⟳ Ciclos abertos</div>'
+      + '<button class="btn-link" style="color:var(--cycle);" onclick="go(\'rotinas\')">ver todos</button></div>'
+      + ciclos.map(c => {
+        const sla = slaLabel(c);
+        return '<div class="pmini"><div class="pmini-head">'
+          + '<span class="pmini-name"><span class="txt">' + esc(c.routine_name || c.name) + '</span></span>'
+          + '<span class="sla' + sla.cls + '" style="font-size:11px;">' + esc(sla.txt) + '</span></div>'
+          + stageSegments(c) + stageLine(c) + '</div>';
+      }).join('')
+      + '</div>';
+  }
   html += '<div class="scard"><div class="scard-head"><div class="scard-title">Projetos</div>'
     + '<button class="btn-link" onclick="go(\'projetos\')">ver todos</button></div>'
     + (active.length ? active.map(projMini).join('')
       : '<div class="empty" style="padding:0; font-size:13px;">Nenhum projeto ativo.</div>')
     + '</div>';
   html += '<div class="scard"><div class="scard-title">Ritual do dia</div>'
-    + '<div class="scard-sub">Checkpoint de projeto e análise da execução.</div>'
-    + '<div class="quick">'
+    + '<div class="scard-sub">O que hoje exige de você.</div>'
+    + (S.ritual.length
+      ? '<div class="ritual">' + S.ritual.map(r =>
+          '<div class="ritual-item ritual-' + r.level + '">'
+          + '<span class="ritual-dot"></span>'
+          + '<span><span class="ritual-text">' + esc(r.title) + '</span>'
+          + '<span class="ritual-detail"> — ' + esc(r.detail) + '</span>'
+          + ' <button class="btn-link" onclick="' + (r.action === 'close'
+              ? 'closeCycle(' + r.project_id + ')'
+              : 'openCheckpointFor(' + r.project_id + ')') + '">'
+          + (r.action === 'close' ? 'fechar' : 'checkpoint') + '</button></span></div>'
+        ).join('') + '</div>'
+      : '<div class="ritual-empty">Nada vencendo hoje.</div>')
+    + '<div class="quick" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">'
     + '<button class="btn" onclick="openCheckpoint()">Checkpoint</button>'
     + '<button class="btn" onclick="go(\'rev\')">Análise</button>'
     + '</div></div>';
@@ -536,9 +773,13 @@ function renderProjetos() {
       + '<span class="proj-dot ' + projClass(p.id) + '"></span>' + esc(p.name) + '</span>'
       + '<span class="' + statusCls(p.tag) + '" style="padding:3px 8px;">' + esc(p.tag) + '</span></div>'
       + '<div class="pcard-goal">' + esc(p.goal) + '</div>'
+      + stageSegments(p)
+      + (p.stages.length ? stageLine(p) : '')
       + '<div class="pcard-meta"><span>' + p.tasks.done + '/' + p.tasks.total + ' tarefas</span>'
       + (p.deadline ? '<span style="' + (late ? 'color:var(--warn);' : '') + '">entrega ' + fmtShort(p.deadline) + (late ? ' • vencido' : '') + '</span>' : '')
-      + '</div>';
+      + '</div>'
+      + currentCriteria(p)
+      + stageToggle(p);
     if (tl.length) {
       html += '<div class="ptl">' + tl.map((c, i) => {
         const end = i === tl.length - 1;
@@ -561,6 +802,296 @@ function renderProjetos() {
   }
   html += '</div>';
   document.getElementById('view-projetos').innerHTML = html;
+}
+
+function slaLabel(c) {
+  if (!c.open) return { txt: 'fechado', cls: '' };
+  const left = c.sla_left_days;
+  if (left === null || left === undefined) return { txt: 'sem prazo', cls: '' };
+  if (left < 0) return { txt: 'SLA estourado há ' + (-left) + (left === -1 ? ' dia' : ' dias'), cls: ' warn' };
+  if (left === 0) return { txt: 'SLA vence hoje', cls: ' warn' };
+  if (left <= 2) return { txt: 'SLA em ' + left + (left === 1 ? ' dia' : ' dias'), cls: ' soon' };
+  return { txt: 'SLA em ' + left + ' dias', cls: '' };
+}
+
+function cycleCard(c) {
+  const sla = slaLabel(c);
+  let html = '<div class="ccard' + (c.open ? '' : ' done') + '">'
+    + '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">'
+    + '<div style="min-width:0;">'
+    + '<div class="ckicker"><span>⟳</span>' + esc(c.period_label || '') + (c.cadence ? ' · ' + esc(c.cadence) : '') + '</div>'
+    + '<div class="cname">' + esc(c.routine_name || c.name) + '</div>'
+    + '<div class="cgoal">' + esc(c.goal) + '</div></div>'
+    + '<span class="' + statusCls(c.tag) + '" style="padding:3px 8px;">' + esc(c.tag) + '</span></div>'
+    + '<div class="cmeta"><span>janela ' + esc(c.window_label || '—') + '</span>'
+    + '<span class="sla' + sla.cls + '">' + esc(sla.txt) + '</span>'
+    + '<span>' + c.tasks.done + '/' + c.tasks.total + ' tarefas</span></div>'
+    + stageSegments(c)
+    + stageLine(c)
+    + currentCriteria(c)
+    + stageToggle(c);
+  if (c.open) {
+    html += '<div class="pcard-actions">'
+      + '<button class="btn" onclick="openCheckpointFor(' + c.id + ')">Fazer checkpoint</button>'
+      + '<button class="btn-plain" onclick="closeCycle(' + c.id + ')">Fechar ciclo</button></div>';
+  }
+  return html + '</div>';
+}
+
+// --- Nova rotina -----------------------------------------------------------
+// Os campos de texto vivem no DOM. Antes de qualquer re-render estrutural
+// (trocar cadência, mexer no checklist) a gente colhe os valores para o estado,
+// senão o que estava digitado some.
+
+const CADENCIAS = [['diária', 'daily'], ['semanal', 'weekly'],
+                   ['mensal', 'monthly'], ['trimestral', 'quarterly']];
+
+function nrVal(id, fallback) {
+  const el = document.getElementById(id);
+  return el ? el.value : fallback;
+}
+
+function nrHarvest() {
+  S.nr.name = nrVal('nr-name', S.nr.name || '');
+  S.nr.goal = nrVal('nr-goal', S.nr.goal || '');
+  S.nr.anchor = nrVal('nr-anchor', S.nr.anchor);
+  S.nr.sla = nrVal('nr-sla', S.nr.sla);
+  S.nr.sName = nrVal('ns-name', '');
+  S.nr.sCriteria = nrVal('ns-criteria', '');
+  S.nr.sOffset = nrVal('ns-offset', 0);
+}
+
+function toggleNr() {
+  S.nr = { open: !S.nr.open, cadence: 'monthly', anchor: 1, sla: 5, stages: [], preview: '' };
+  render();
+  if (S.nr.open) { document.getElementById('nr-name').focus(); nrLoadPreview(); }
+}
+
+function nrSetCadence(c) {
+  nrHarvest();
+  S.nr.cadence = c;
+  if (c === 'daily') S.nr.anchor = 0;
+  else if (!Number(S.nr.anchor)) S.nr.anchor = 1;
+  render();
+  nrLoadPreview();
+}
+
+function nrOnWindowChange() { nrHarvest(); render(); nrLoadPreview(); }
+
+async function nrLoadPreview() {
+  const q = '?cadence=' + S.nr.cadence + '&anchor=' + (Number(S.nr.anchor) || 0)
+    + '&sla_days=' + (Number(S.nr.sla) || 1);
+  try {
+    S.nr.preview = (await api('/api/routines/preview' + q)).window_label;
+  } catch (e) {
+    S.nr.preview = e.message;
+  }
+  const el = document.getElementById('nr-preview');
+  if (el) el.textContent = S.nr.preview;   // sem re-render: não rouba o foco
+}
+
+function nrAddStage() {
+  nrHarvest();
+  const name = (S.nr.sName || '').trim(), criteria = (S.nr.sCriteria || '').trim();
+  if (!name || !criteria) { toast('Etapa precisa de nome e critério de pronto.'); return; }
+  S.nr.stages.push({ name, done_criteria: criteria, offset_days: Number(S.nr.sOffset) || 0 });
+  S.nr.sName = ''; S.nr.sCriteria = '';
+  S.nr.sOffset = Math.min(60, (Number(S.nr.sOffset) || 0) + 1);
+  render();
+  const el = document.getElementById('ns-name');
+  if (el) el.focus();
+}
+
+function nrStageKey(e) { if (e.key === 'Enter') { e.preventDefault(); nrAddStage(); } }
+
+function nrMoveStage(i, delta) {
+  const j = i + delta;
+  if (j < 0 || j >= S.nr.stages.length) return;
+  nrHarvest();
+  const a = S.nr.stages;
+  [a[i], a[j]] = [a[j], a[i]];
+  render();
+}
+
+function nrRemoveStage(i) {
+  nrHarvest();
+  S.nr.stages.splice(i, 1);
+  render();
+}
+
+async function saveRoutine() {
+  nrHarvest();
+  const name = (S.nr.name || '').trim(), goal = (S.nr.goal || '').trim();
+  if (!name || !goal) { toast('Preencha nome e o que é fechar o ciclo.'); return; }
+  if (!S.nr.stages.length) { toast('Adicione ao menos uma etapa com critério de pronto.'); return; }
+  try {
+    await api('/api/routines', {
+      name, goal,
+      cadence: S.nr.cadence,
+      anchor: Number(S.nr.anchor) || 0,
+      sla_days: Number(S.nr.sla) || 1,
+      steps: S.nr.stages,
+    });
+    S.nr = { open: false, cadence: 'monthly', anchor: 1, sla: 5, stages: [], preview: '' };
+    await loadState();
+    toast('Rotina criada — o ciclo nasce quando a janela abrir.');
+  } catch (e) { toast(e.message); }
+}
+
+async function openCycleNow(id) {
+  try {
+    await api('/api/routines/' + id + '/run', {});
+    S.review.metrics = null;   // o ciclo entra nas métricas da Análise
+    await loadState();
+    toast('Ciclo aberto.');
+  } catch (e) { toast(e.message); }
+}
+
+function nrForm() {
+  const anchorLabel = S.nr.cadence === 'daily' ? 'abre no dia (não usado)'
+    : (S.nr.cadence === 'weekly' ? 'dia da semana (1=seg)' : 'dia de abertura');
+  const st = S.nr.stages;
+  return '<div class="nrform">'
+    + '<div><div style="font-size:17px; font-weight:600;">Nova rotina</div>'
+    + '<div class="nrhint" style="margin-top:3px;">O molde do trabalho que volta. '
+    + 'Cada período vira um ciclo, materializado quando a janela abre.</div></div>'
+
+    + '<div class="nrgrid">'
+    + '<label class="nrfield"><span>Nome da rotina</span>'
+    + '<input id="nr-name" placeholder="Ex.: Janela de Comissões" value="' + esc(S.nr.name || '') + '"></label>'
+    + '<label class="nrfield"><span>O que é fechar o ciclo</span>'
+    + '<input id="nr-goal" placeholder="Ex.: comissões conciliadas e comunicadas" value="' + esc(S.nr.goal || '') + '"></label>'
+    + '</div>'
+
+    + '<div class="nrfield"><span>Cadência</span><div class="cadrow">'
+    + CADENCIAS.map(([rot, key]) => '<button class="cadbtn' + (S.nr.cadence === key ? ' on' : '')
+        + '" onclick="nrSetCadence(\'' + key + '\')">' + rot + '</button>').join('')
+    + '</div></div>'
+
+    + '<div class="nrgrid3">'
+    + '<label class="nrfield"><span>' + anchorLabel + '</span>'
+    + '<input id="nr-anchor" type="number" min="0" max="31" value="' + esc(String(S.nr.anchor))
+    + '" onchange="nrOnWindowChange()"' + (S.nr.cadence === 'daily' ? ' disabled' : '') + '></label>'
+    + '<label class="nrfield"><span>SLA em dias</span>'
+    + '<input id="nr-sla" type="number" min="1" max="60" value="' + esc(String(S.nr.sla))
+    + '" onchange="nrOnWindowChange()"></label>'
+    + '<div class="nrfield"><span>Janela</span><div class="nrprev" id="nr-preview">' + esc(S.nr.preview || '…') + '</div></div>'
+    + '</div>'
+
+    + '<div class="nrfield"><div style="display:flex; justify-content:space-between; align-items:baseline;">'
+    + '<span>Checklist de etapas — cada uma com seu critério de pronto</span>'
+    + '<span class="pmini-prog">'
+    + (st.length ? st.length + ' etapa' + (st.length > 1 ? 's' : '') : 'nenhuma') + '</span></div>'
+    + '<div class="nslist">'
+    + (st.length ? '' : '<div class="nrhint" style="padding:14px 16px; color:var(--faint);">'
+        + 'Sem etapas ainda. Uma rotina sem etapas vira só uma lista de tarefas — o critério é o que o checkpoint julga.</div>')
+    + st.map((s, i) => '<div class="nsitem"><span class="nspos">' + (i + 1) + '.</span>'
+        + '<div style="flex:1; min-width:0;">'
+        + '<div style="display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;">'
+        + '<span style="font-size:14px; font-weight:600;">' + esc(s.name) + '</span>'
+        + '<span class="stdue">D+' + s.offset_days + '</span></div>'
+        + '<div class="scrit" style="margin-top:4px;"><span class="scrit-kick">pronto quando</span>' + esc(s.done_criteria) + '</div>'
+        + '</div>'
+        + '<div style="display:flex; gap:2px;">'
+        + '<button class="nsact" title="subir" onclick="nrMoveStage(' + i + ',-1)">↑</button>'
+        + '<button class="nsact" title="descer" onclick="nrMoveStage(' + i + ',1)">↓</button>'
+        + '<button class="nsact" title="remover" onclick="nrRemoveStage(' + i + ')">✕</button>'
+        + '</div></div>').join('')
+    + '<div class="nsrow">'
+    + '<input id="ns-name" placeholder="Nome da etapa" value="' + esc(S.nr.sName || '') + '" onkeydown="nrStageKey(event)">'
+    + '<input id="ns-criteria" placeholder="Critério de pronto (verificável)" value="' + esc(S.nr.sCriteria || '') + '" onkeydown="nrStageKey(event)">'
+    + '<input id="ns-offset" type="number" min="0" max="60" title="dias após a abertura da janela" value="'
+    + esc(String(S.nr.sOffset || 0)) + '" onkeydown="nrStageKey(event)">'
+    + '<button class="btn-cycle-soft" onclick="nrAddStage()">+</button>'
+    + '</div></div>'
+    + '<div class="pmini-prog" style="margin-top:6px;">o número é o prazo da etapa em dias após a abertura da janela</div>'
+    + '</div>'
+
+    + '<div class="nrfoot"><span class="nrhint">'
+    + (st.length
+        ? 'Ao abrir a janela, o ciclo nasce com ' + st.length + ' etapa' + (st.length > 1 ? 's' : '')
+          + ' e prazo final em D+' + ((Number(S.nr.sla) || 1) - 1) + '.'
+        : 'Adicione ao menos uma etapa com critério verificável.')
+    + '</span><div style="display:flex; gap:8px;">'
+    + '<button class="btn-plain" onclick="toggleNr()">Cancelar</button>'
+    + '<button class="btn-cycle" onclick="saveRoutine()">Criar rotina</button></div></div>'
+    + '</div>';
+}
+
+function moldCard(r) {
+  const aberto = S.routine_runs.some(c => c.routine_id === r.id && c.open);
+  const resumo = r.cadence + ' · janela ' + r.window_label + ' · SLA ' + r.sla_days + 'd'
+    + (r.steps.length ? ' · ' + r.steps.length + ' etapa' + (r.steps.length > 1 ? 's' : '') : '');
+  return '<div class="ccard done" style="display:flex; align-items:center; gap:16px; padding:16px 22px;">'
+    + '<span class="mono" style="color:var(--cycle);">⟳</span>'
+    + '<div style="flex:1; min-width:0;">'
+    + '<div style="font-size:14.5px; font-weight:600;">' + esc(r.name) + '</div>'
+    + '<div class="pmini-prog" style="margin-top:3px;">' + esc(resumo) + '</div></div>'
+    + (aberto
+      ? '<span class="sbadge" style="color:var(--cycle-text); background:var(--cycle-soft);">ciclo aberto</span>'
+      : (r.steps.length
+        ? '<button class="btn-cycle-soft" onclick="openCycleNow(' + r.id + ')">abrir ciclo agora</button>'
+        : '<span class="sbadge">sem etapas</span>'))
+    + '</div>';
+}
+
+function renderRotinas() {
+  const abertos = S.routine_runs.filter(c => c.open);
+  const fechados = S.routine_runs.filter(c => !c.open).slice().reverse();
+  let html = '<div class="stackv">';
+  html += '<div><div class="kicker" style="color:var(--cycle);">'
+    + '⟳ trabalho que volta · fecha um ciclo e recomeça</div>'
+    + '<div class="page-head" style="align-items:flex-end;">'
+    + '<div class="h-lg">Rotinas</div>'
+    + '<button class="btn-cycle-soft" onclick="toggleNr()">'
+    + (S.nr.open ? 'fechar formulário' : '+ nova rotina') + '</button></div></div>';
+
+  if (S.nr.open) html += nrForm();
+
+  if (!S.routines.length && !S.nr.open) {
+    html += '<div class="empty">Nenhuma rotina cadastrada. Crie aqui em <span class="mono">+ nova rotina</span>, '
+      + 'ou pela CLI com <span class="mono">wa routine add</span>.</div>';
+  }
+
+  if (abertos.length) {
+    html += '<div class="sect-title">ciclos abertos</div>';
+    html += abertos.map(cycleCard).join('');
+  }
+  if (fechados.length) {
+    html += '<div class="sect-title">ciclos fechados</div>';
+    html += fechados.map(c => {
+      const sla = c.closed_on_time === null ? 'sem data de fechamento'
+        : (c.closed_on_time ? 'fechado no SLA' : 'fechado com atraso');
+      const cls = c.closed_on_time === null ? 'sbadge' : (c.closed_on_time ? 'sbadge ok' : 'sbadge risk');
+      return '<div class="ccard done" style="display:flex; align-items:center; gap:12px; padding:16px 22px;">'
+        + '<span class="mono" style="color:var(--faint);">⟳</span>'
+        + '<div style="flex:1; min-width:0;">'
+        + '<div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">'
+        + '<span style="font-size:14.5px; font-weight:600;">' + esc(c.routine_name || c.name) + '</span>'
+        + '<span class="pmini-prog">' + esc(c.period_label || '') + '</span></div>'
+        + '<div class="pmini-prog" style="margin-top:3px;">'
+        + c.stages_progress.done + '/' + c.stages_progress.total + ' etapas'
+        + (c.done_at ? ' · fechado em ' + fmtShort(c.done_at.slice(0, 10)) : '') + '</div></div>'
+        + '<span class="' + cls + '">' + sla + '</span></div>';
+    }).join('');
+  }
+  if (S.routines.length) {
+    html += '<div class="sect-title">rotinas cadastradas</div>';
+    html += S.routines.map(moldCard).join('');
+  }
+  html += '</div>';
+  document.getElementById('view-rotinas').innerHTML = html;
+}
+
+async function closeCycle(id) {
+  const c = S.routine_runs.find(x => x.id === id);
+  const pend = c ? c.stages_progress.total - c.stages_progress.done : 0;
+  const aviso = pend ? '\n\n' + pend + ' etapa(s) ainda pendente(s).' : '';
+  if (!confirm('Fechar o ciclo ' + (c ? c.name : '') + '?' + aviso)) return;
+  await api('/api/projects/' + id + '/done', { method: 'POST' });
+  S.review.metrics = null;  // o SLA do ciclo entra na Análise
+  await loadState();
+  toast('Ciclo fechado.');
 }
 
 function renderChat() {
@@ -601,6 +1132,34 @@ function assessBlocks(text) {
   }
   return parts.length ? parts : [{ title: '', body: text.trim() }];
 }
+function splitBlock(rc) {
+  if (!rc || !rc.attributed) {
+    return '<div class="scard"><div class="rtable-title">Onde seu tempo foi</div>'
+      + '<div class="split-note">Nenhuma tarefa vinculada a projeto ou ciclo no período —'
+      + ' sem isso não dá para separar operação de entrega.</div></div>';
+  }
+  const run = Math.round(rc.run_share * 100), change = 100 - run;
+  const ciclos = rc.cycles_closed
+    ? ' · ' + rc.cycles_on_sla + '/' + rc.cycles_closed + ' ciclos no SLA'
+      + (rc.cycles_unknown ? ' (' + rc.cycles_unknown + ' sem data)' : '')
+    : '';
+  return '<div class="scard">'
+    + '<div class="rtable-title">Onde seu tempo foi</div>'
+    + '<div style="display:flex; align-items:baseline; gap:14px; margin-top:10px; flex-wrap:wrap;">'
+    + '<span class="split-head">' + run + '%</span>'
+    + '<span style="font-size:17px;">do período foi rotina — ' + change + '% foi projeto</span></div>'
+    + '<div class="split"><div class="split-run" style="width:' + run + '%"></div>'
+    + '<div class="split-change" style="width:' + change + '%"></div></div>'
+    + '<div class="split-legend">'
+    + '<span class="run">⟳ rotina · ' + rc.run.total + ' tarefas' + ciclos + '</span>'
+    + '<span class="change">■ projeto · ' + rc.change.total + ' tarefas · '
+    + rc.stages_done + ' etapas fechadas</span></div>'
+    + (rc.loose.total
+      ? '<div class="split-note">' + rc.loose.total + ' tarefa(s) sem projeto nem ciclo ficaram fora do cálculo.</div>'
+      : '')
+    + '</div>';
+}
+
 function renderRev() {
   const m = S.review.metrics;
   let html = '<div class="stackv">';
@@ -625,18 +1184,27 @@ function renderRev() {
     [days_(m.avg_lead_days), 'lead time médio', false],
     [String(m.throughput_per_week), 'concluídas/semana', false],
   ];
+  html += splitBlock(m.run_change);
   html += '<div class="mgrid">' + cards.map(([v, l, bad]) =>
     '<div class="mcard"><div class="mval' + (bad ? ' bad' : '') + '">' + v + '</div><div class="mlabel">' + l + '</div></div>'
   ).join('') + '</div>';
 
-  const max = Math.max(1, ...m.done_per_day.map(d => d.done));
+  const max = Math.max(1, ...m.per_day.map(d => d.done));
   html += '<div class="scard"><div class="rtable-title">Tarefas concluídas por dia</div>'
-    + '<div class="spark">' + m.done_per_day.map(d => {
+    + '<div class="spark">' + m.per_day.map(d => {
       const h = d.done ? Math.max(4, Math.round(d.done / max * 80)) : 3;
-      return '<div class="spark-col" title="' + esc(d.day) + ': ' + d.done + '">'
-        + '<div class="spark-bar" style="height:' + h + 'px; background:' + (d.done ? 'var(--accent)' : 'var(--chip)') + ';"></div>'
+      // Empilha por natureza: a altura total continua sendo `done`.
+      const seg = (n, cor) => n ? '<div style="height:' + Math.round(h * n / d.done) + 'px; background:' + cor + ';"></div>' : '';
+      const dica = d.day + ': ' + d.done + ' (rotina ' + d.run + ', projeto ' + d.change + ', sem vínculo ' + d.loose + ')';
+      return '<div class="spark-col" title="' + esc(dica) + '">'
+        + (d.done
+          ? '<div class="spark-bar" style="height:' + h + 'px; background:transparent; display:flex; flex-direction:column-reverse;">'
+            + seg(d.run, 'var(--cycle)') + seg(d.change, 'var(--accent)') + seg(d.loose, 'var(--chip)') + '</div>'
+          : '<div class="spark-bar" style="height:3px; background:var(--chip);"></div>')
         + '<span class="spark-tick">' + d.day.slice(8) + '</span></div>';
-    }).join('') + '</div></div>';
+    }).join('') + '</div>'
+    + '<div class="split-legend" style="margin-top:10px;"><span class="run">■ rotina</span>'
+    + '<span class="change">■ projeto</span><span style="color:var(--faint);">■ sem vínculo</span></div></div>';
 
   // Por esforço + por tag lado a lado
   html += '<div class="tables">';
@@ -669,7 +1237,8 @@ function renderRev() {
       + '<span style="width:56px; text-align:right;">Concl.</span><span style="width:64px; text-align:right;">Atras.</span>'
       + '<span style="width:80px; text-align:right;">Lead méd.</span></div>'
       + Object.entries(m.by_project).map(([pid, s]) =>
-        '<div class="rt-row"><span style="flex:1;"><span class="proj-chip ' + projClass(Number(pid)) + '">' + esc(s.name) + '</span></span>'
+        '<div class="rt-row"><span style="flex:1;"><span class="proj-chip ' + projClass(Number(pid)) + '">'
+        + (s.kind === 'routine_run' ? '⟳ ' : '') + esc(s.name) + '</span></span>'
         + '<span style="width:56px; text-align:right; color:var(--dim);">' + s.total + '</span>'
         + '<span style="width:56px; text-align:right; color:var(--dim);">' + s.done + '</span>'
         + '<span style="width:64px; text-align:right;' + (s.overdue ? ' color:var(--warn);' : '') + '" class="mono">' + s.overdue + '</span>'
@@ -741,6 +1310,7 @@ function openTaskEdit(id) {
   S.edit = {
     id: t.id,
     project_id: t.project_id || '',
+    stage_id: t.stage_id || '',
     tags: (t.tags || []).join(', '),
     due: t.due || '',
     effort: t.effort || '',
@@ -748,14 +1318,26 @@ function openTaskEdit(id) {
   S.modal = 'edit';
   render();
 }
+// Trocar o destino invalida a etapa: ela pertence a um projeto só (regra do backend).
+function onEditProjectChange() {
+  const v = document.getElementById('edit-project').value;
+  S.edit.project_id = v ? Number(v) : '';
+  S.edit.stage_id = '';
+  S.edit.tags = document.getElementById('edit-tags').value;
+  S.edit.due = document.getElementById('edit-due').value;
+  S.edit.effort = document.getElementById('edit-eff').value;
+  render();
+}
 async function saveTaskEdit() {
   const projectVal = document.getElementById('edit-project').value;
   const project_id = projectVal ? Number(projectVal) : null;
+  const stageVal = document.getElementById('edit-stage').value;
+  const stage_id = stageVal ? Number(stageVal) : null;
   const tags = document.getElementById('edit-tags').value.split(',').map(t => t.trim()).filter(Boolean);
   const due_date = document.getElementById('edit-due').value || null;
   const effort = document.getElementById('edit-eff').value || null;
   try {
-    await api('/api/tasks/' + S.edit.id, { project_id, tags, due_date, effort });
+    await api('/api/tasks/' + S.edit.id, { project_id, stage_id, tags, due_date, effort });
     S.modal = null;
     S.review.metrics = null;
     await loadState();
@@ -831,31 +1413,43 @@ async function savePlan() {
 }
 
 // --- Modal: checkpoint -----------------------------------------------------
+// Checkpoint vale para projeto e para ciclo de rotina — os dois são frentes
+// avaliáveis, e o backend trata ciclo como uma linha de projects.
+function cpTargets() {
+  return S.projects.filter(p => p.active).concat(S.routine_runs.filter(c => c.open));
+}
+function findTarget(id) {
+  return cpTargets().find(x => x.id === id)
+    || S.projects.concat(S.routine_runs).find(x => x.id === id);
+}
+function cpState(x) {
+  return {
+    stage: 'input', projectId: x.id, name: x.name, goal: x.goal,
+    isCycle: x.kind === 'routine_run', stages: x.stages || [],
+    text: '', blocks: [], status: '', verdicts: [],
+  };
+}
 function openCheckpoint() {
   if (!guardLLM()) return;
-  const active = S.projects.filter(p => p.active);
-  if (!active.length) { toast('Cadastre um projeto antes de fazer checkpoint.'); return; }
+  const alvos = cpTargets();
+  if (!alvos.length) { toast('Cadastre um projeto ou rotina antes de fazer checkpoint.'); return; }
   S.modal = 'checkpoint';
-  if (active.length === 1) {
-    S.cp = { stage: 'input', projectId: active[0].id, name: active[0].name, goal: active[0].goal, text: '', blocks: [], status: '' };
-  } else {
-    S.cp = { stage: 'pick', projectId: null, name: '', goal: '', text: '', blocks: [], status: '' };
-  }
+  S.cp = alvos.length === 1 ? cpState(alvos[0])
+    : { stage: 'pick', projectId: null, name: '', goal: '', text: '', blocks: [], status: '', verdicts: [], stages: [] };
   render();
 }
 function openCheckpointFor(id) {
   if (!guardLLM()) return;
-  const p = S.projects.find(p => p.id === id);
+  const x = findTarget(id);
+  if (!x) { toast('Frente não encontrada.'); return; }
   S.modal = 'checkpoint';
-  S.cp = { stage: 'input', projectId: p.id, name: p.name, goal: p.goal, text: '', blocks: [], status: '' };
+  S.cp = cpState(x);
   render();
 }
 function pickCp(id) {
-  const p = S.projects.find(p => p.id === id);
-  S.cp.stage = 'input';
-  S.cp.projectId = p.id;
-  S.cp.name = p.name;
-  S.cp.goal = p.goal;
+  const x = findTarget(id);
+  if (!x) return;
+  S.cp = cpState(x);
   render();
 }
 async function runCp() {
@@ -867,6 +1461,7 @@ async function runCp() {
     const r = await api('/api/checkpoint', { project_id: S.cp.projectId, progress: S.cp.text });
     S.cp.blocks = r.blocks;
     S.cp.status = r.status || '';
+    S.cp.verdicts = r.verdicts || [];
     S.cp.stage = 'result';
     render();
     loadState();
@@ -908,14 +1503,26 @@ function renderModal() {
   } else if (S.modal === 'edit') {
     // Inclui os ciclos de rotina: sem eles, uma tarefa de ciclo abriria o popover sem
     // a própria opção e o save gravaria "sem projeto", perdendo o vínculo.
+    // Inclui os ciclos de rotina: sem eles, uma tarefa de ciclo abriria o popover sem
+    // a própria opção e o save gravaria "sem projeto", perdendo o vínculo.
     const active = S.projects.concat(S.routine_runs)
       .filter(p => p.active || p.id === S.edit.project_id);
+    const alvo = active.find(p => p.id === S.edit.project_id);
+    const etapas = alvo ? alvo.stages : [];
     inner = '<div class="modal-title">Editar tarefa</div>'
-      + '<div class="modal-sub" style="font-size:13.5px;">Projeto, tags, prazo e esforço.</div>'
-      + '<div class="efield"><label>Projeto</label>'
-      + '<select id="edit-project"><option value="">— sem projeto —</option>'
-      + active.map(p => '<option value="' + p.id + '"' + (p.id === S.edit.project_id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('')
+      + '<div class="modal-sub" style="font-size:13.5px;">Destino, etapa, tags, prazo e esforço.</div>'
+      + '<div class="efield-row">'
+      + '<div class="efield"><label>Projeto ou ciclo</label>'
+      + '<select id="edit-project" onchange="onEditProjectChange()"><option value="">— sem projeto —</option>'
+      + active.map(p => '<option value="' + p.id + '"' + (p.id === S.edit.project_id ? ' selected' : '') + '>'
+          + (p.kind === 'routine_run' ? '⟳ ' : '') + esc(p.name) + '</option>').join('')
       + '</select></div>'
+      + '<div class="efield"><label>Etapa</label>'
+      + '<select id="edit-stage"' + (etapas.length ? '' : ' disabled') + '>'
+      + '<option value="">' + (alvo ? (etapas.length ? '— sem etapa —' : 'sem etapas neste destino') : '— escolha o destino —') + '</option>'
+      + etapas.map(st => '<option value="' + st.id + '"' + (st.id === S.edit.stage_id ? ' selected' : '') + '>'
+          + st.position + '. ' + esc(st.name) + '</option>').join('')
+      + '</select></div></div>'
       + '<div class="efield"><label>Tags (separadas por vírgula)</label>'
       + '<input id="edit-tags" placeholder="ex.: bug, dados" value="' + esc(S.edit.tags) + '"></div>'
       + '<div class="efield-row">'
@@ -927,25 +1534,45 @@ function renderModal() {
       + '<button class="btn-primary" onclick="saveTaskEdit()">Salvar</button></div>';
   } else if (S.modal === 'checkpoint') {
     if (S.cp.stage === 'pick') {
-      const active = S.projects.filter(p => p.active);
       inner = '<div class="modal-title">Checkpoint</div>'
-        + '<div class="modal-sub">De qual projeto?</div>'
-        + '<div class="pick-list">' + active.map(p =>
-          '<button onclick="pickCp(' + p.id + ')"><span class="p-name">' + esc(p.name) + '</span>'
-          + '<span class="p-goal">' + esc(p.goal) + '</span></button>').join('') + '</div>'
+        + '<div class="modal-sub">De qual frente?</div>'
+        + '<div class="pick-list">' + cpTargets().map(x =>
+          '<button onclick="pickCp(' + x.id + ')"><span class="p-name">'
+          + (x.kind === 'routine_run' ? '⟳ ' : '') + esc(x.name) + '</span>'
+          + '<span class="p-goal">' + esc(x.goal) + '</span></button>').join('') + '</div>'
         + '<div class="modal-actions"><button class="btn-plain" onclick="closeModal()">Cancelar</button></div>';
     } else if (S.cp.stage === 'input') {
-      inner = '<div class="modal-title">Checkpoint — ' + esc(S.cp.name) + '</div>'
+      // Os critérios de pronto vêm ANTES do campo de texto: é contra eles que o
+      // modelo vai julgar, então o usuário relata sabendo o que precisa provar.
+      const stages = S.cp.stages || [];
+      inner = '<div class="modal-title">Checkpoint — ' + (S.cp.isCycle ? '⟳ ' : '') + esc(S.cp.name) + '</div>'
         + '<div class="modal-sub" style="font-size:13.5px;">Objetivo: ' + esc(S.cp.goal) + '</div>'
+        + (stages.length ? '<div style="margin:14px 0; border:1px solid var(--line); border-radius:10px;">'
+            + stages.map(st => '<div class="strow' + (st.is_current ? ' strow-cur' : '') + '">'
+              + '<span class="stbox' + (st.done ? ' done' : (st.overdue ? ' late' : '')) + '">' + (st.done ? '✓' : '') + '</span>'
+              + '<div style="flex:1; min-width:0;">'
+              + '<span class="stname' + (st.done ? ' done' : '') + '">' + esc(st.name) + '</span>'
+              + (st.done_criteria ? '<div class="scrit" style="margin-top:4px;"><span class="scrit-kick">pronto quando</span>' + esc(st.done_criteria) + '</div>' : '')
+              + '</div></div>').join('')
+            + '</div>' : '')
         + '<textarea id="cp-text" rows="5" placeholder="Como está o progresso? (o que avançou, o que travou, o que falta)">' + esc(S.cp.text) + '</textarea>'
         + '<div class="modal-actions"><button class="btn-plain" onclick="closeModal()">Cancelar</button>'
         + '<button class="btn-primary" onclick="runCp()">Avaliar progresso</button></div>';
     } else if (S.cp.stage === 'thinking') {
       inner = '<div class="wait"><span class="spinner lg"></span><span>Avaliando progresso…</span></div>';
     } else {
-      inner = '<div style="display:flex; align-items:center; gap:12px;">'
+      const vs = S.cp.verdicts || [];
+      inner = '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">'
         + '<div class="modal-title">Avaliação — ' + esc(S.cp.name) + '</div>'
         + (S.cp.status ? '<span class="' + statusCls(S.cp.status) + '">' + esc(S.cp.status) + '</span>' : '') + '</div>'
+        + (vs.length ? '<div style="margin-top:16px; display:flex; flex-direction:column; gap:10px;">'
+            + vs.map(v => '<div style="border:1px solid var(--line); border-radius:10px; padding:12px 14px;">'
+              + '<div style="display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;">'
+              + '<span class="verdict ' + (v.verdict === 'atende' ? 'ok' : (v.verdict === 'nao_atende' ? 'no' : '')) + '">' + esc(v.label) + '</span>'
+              + '<span style="font-size:14px; font-weight:600;">' + esc(v.stage_name) + '</span></div>'
+              + (v.rationale ? '<div class="verdict-why">' + esc(v.rationale) + '</div>' : '')
+              + '</div>').join('')
+            + '</div>' : '')
         + '<div class="blocks">' + S.cp.blocks.map(b =>
           '<div><div class="block-title">' + esc(b.title) + '</div>'
           + '<div class="block-body">' + esc(b.body) + '</div></div>').join('') + '</div>'

@@ -252,7 +252,7 @@ def _janela():
     return runner.invoke(
         app,
         ["routine", "add", "Janela de Comissões", "-g", "fechar no SLA",
-         "-c", "monthly", "-o", "1", "-s", "4"],
+         "-c", "monthly", "-o", "1", "-s", "5"],
     )
 
 
@@ -261,7 +261,7 @@ def test_routine_add_and_list(monkeypatch):
     result = _janela()
     assert result.exit_code == 0
     assert "Rotina #1 criada" in result.output
-    assert "mensal, dia 1 (+4d)" in result.output
+    assert "mensal, dia 1 (janela 5d)" in result.output
 
     result = runner.invoke(app, ["routine", "list"])
     assert result.exit_code == 0
@@ -401,6 +401,10 @@ def _mock_llm(monkeypatch):
             "situacao": "Reconciliação parada.",
             "riscos": "Critério não verificado.",
             "proximo_passo": ["Rodar o batimento"],
+            "vereditos": [
+                {"etapa": "Reconciliar", "veredito": "nao_atende",
+                 "justificativa": "sem batimento"}
+            ],
             "status": "em risco",
             "resumo": "Em risco — reconciliação sem batimento.",
         },
@@ -444,3 +448,28 @@ def test_checkpoint_without_stages_keeps_the_old_flow(monkeypatch):
     assert result.exit_code == 0
     assert "Qual etapa?" not in result.output
     assert "Reconciliação parada." in result.output
+
+
+def test_checkpoint_prints_stage_verdicts(monkeypatch):
+    monkeypatch.setenv("COLUMNS", "200")
+    monkeypatch.setattr(
+        llm,
+        "structured",
+        lambda *a, **k: {
+            "situacao": "Reconciliação parada.",
+            "riscos": "Critério não verificado.",
+            "proximo_passo": ["Rodar o batimento"],
+            "status": "em risco",
+            "resumo": "Em risco.",
+            "vereditos": [
+                {"etapa": "Extrair base", "veredito": "atende", "justificativa": "arquivo chegou"},
+                {"etapa": "Reconciliar", "veredito": "nao_atende", "justificativa": "sem batimento"},
+            ],
+        },
+    )
+    _projeto_com_etapas()
+    result = runner.invoke(app, ["checkpoint", "Janela"], input="\nrelato\n")
+    assert result.exit_code == 0
+    assert "atende" in result.output
+    assert "não atende" in result.output
+    assert "sem batimento" in result.output

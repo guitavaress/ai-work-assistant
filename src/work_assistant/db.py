@@ -16,8 +16,9 @@ CREATE TABLE IF NOT EXISTS projects (
     deadline TEXT,                          -- data-alvo da entrega (YYYY-MM-DD)
     kind TEXT NOT NULL DEFAULT 'project',   -- project | routine_run (ciclo de uma rotina)
     routine_id INTEGER REFERENCES routines(id),  -- preenchido só em routine_run
-    period TEXT,                            -- período do ciclo: 'YYYY-MM' ou 'YYYY-Www'
-    created_at TEXT NOT NULL
+    period TEXT,                            -- período do ciclo: 'YYYY-MM', 'YYYY-Www' ou 'YYYY-MM-DD'
+    created_at TEXT NOT NULL,
+    done_at TEXT                            -- quando foi concluído (NULL em registros antigos)
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -66,8 +67,18 @@ CREATE TABLE IF NOT EXISTS routines (
     cadence TEXT NOT NULL,                   -- monthly | weekly
     anchor INTEGER NOT NULL,                 -- mensal: dia 1..31 ou -1..-28 (do fim do mês)
                                              -- semanal: dia ISO 1..7 (1 = segunda)
-    sla_days INTEGER NOT NULL DEFAULT 0,     -- prazo do ciclo = abertura + sla_days
+    sla_days INTEGER NOT NULL DEFAULT 1,     -- duração da janela em dias, contando o
+                                             -- dia de abertura (abre 1, fecha 5 = 5)
     status TEXT NOT NULL DEFAULT 'active',   -- active | archived
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS checkpoint_verdicts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    checkpoint_id INTEGER NOT NULL REFERENCES checkpoints(id),
+    stage_id INTEGER NOT NULL REFERENCES stages(id),
+    verdict TEXT NOT NULL,     -- atende | nao_atende | nao_avaliada
+    rationale TEXT,            -- justificativa curta do modelo
     created_at TEXT NOT NULL
 );
 
@@ -91,6 +102,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_routine_period
 CREATE INDEX IF NOT EXISTS idx_stages_project ON stages(project_id, position);
 CREATE INDEX IF NOT EXISTS idx_tasks_stage ON tasks(stage_id);
 CREATE INDEX IF NOT EXISTS idx_routine_steps_routine ON routine_steps(routine_id, position);
+CREATE INDEX IF NOT EXISTS idx_verdicts_checkpoint ON checkpoint_verdicts(checkpoint_id);
+CREATE INDEX IF NOT EXISTS idx_verdicts_stage ON checkpoint_verdicts(stage_id, id);
 """
 
 # Colunas adicionadas depois do schema inicial: bancos existentes precisam de ALTER.
@@ -112,11 +125,26 @@ _MIGRATIONS = {
         "kind": "ALTER TABLE projects ADD COLUMN kind TEXT NOT NULL DEFAULT 'project'",
         "routine_id": "ALTER TABLE projects ADD COLUMN routine_id INTEGER REFERENCES routines(id)",
         "period": "ALTER TABLE projects ADD COLUMN period TEXT",
+        "done_at": "ALTER TABLE projects ADD COLUMN done_at TEXT",
     },
 }
 
+# Versão do ESQUEMA DE DADO deste pacote, guardada no `PRAGMA user_version` do
+# arquivo .db. Atenção: o pragma é global do arquivo, que é compartilhado com
+# outras branches (ver comentário das constantes de coluna abaixo).
+#   1 — sla_days passou de deslocamento para duração da janela.
+SCHEMA_VERSION = 1
+
 EFFORT_LEVELS = ("P", "M", "G")
 STAGE_STATUSES = ("pending", "done")
+# Valores em ASCII porque o enum vira gramática GBNF no llm.structured();
+# a acentuação vive só na exibição (VERDICT_LABELS).
+VERDICT_VALUES = ("atende", "nao_atende", "nao_avaliada")
+VERDICT_LABELS = {
+    "atende": "atende",
+    "nao_atende": "não atende",
+    "nao_avaliada": "não avaliada",
+}
 # Um projeto normal é uma entrega finita; um routine_run é o ciclo materializado de
 # uma rotina (ex.: "Janela de Comissões — 2026-08") e reaproveita toda a máquina de
 # etapas, tarefas e checkpoints.
@@ -129,7 +157,9 @@ TASK_COLUMNS = (
     "id, title, project_id, day, status, priority, created_at, done_at,"
     " due_date, tags, source, effort, stage_id"
 )
-PROJECT_COLUMNS = "id, name, goal, status, created_at, deadline, kind, routine_id, period"
+PROJECT_COLUMNS = (
+    "id, name, goal, status, created_at, deadline, kind, routine_id, period, done_at"
+)
 CHECKPOINT_COLUMNS = (
     "id, project_id, progress, assessment, status, summary, created_at, stage_id"
 )
@@ -140,6 +170,7 @@ ROUTINE_COLUMNS = "id, name, goal, cadence, anchor, sla_days, status, created_at
 ROUTINE_STEP_COLUMNS = (
     "id, routine_id, name, position, offset_days, done_criteria, created_at"
 )
+VERDICT_COLUMNS = "id, checkpoint_id, stage_id, verdict, rationale, created_at"
 
 
 @dataclass
@@ -170,6 +201,7 @@ class Project:
     kind: str = "project"
     routine_id: int | None = None
     period: str | None = None
+    done_at: str | None = None
 
 
 @dataclass
@@ -195,6 +227,16 @@ class Stage:
     done_criteria: str | None
     created_at: str
     done_at: str | None = None
+
+
+@dataclass
+class CheckpointVerdict:
+    id: int
+    checkpoint_id: int
+    stage_id: int
+    verdict: str
+    rationale: str | None
+    created_at: str
 
 
 @dataclass
@@ -228,6 +270,7 @@ def connect(db_path: Path | None = None) -> sqlite3.Connection:
     conn.executescript(SCHEMA)
     _migrate(conn)
     conn.executescript(INDEXES)  # depois do _migrate: dependem das colunas novas
+    _migrate_data(conn)
     return conn
 
 
@@ -238,6 +281,23 @@ def _migrate(conn: sqlite3.Connection) -> None:
             if column not in existing:
                 conn.execute(ddl)
     conn.commit()
+
+
+def _migrate_data(conn: sqlite3.Connection) -> None:
+    """Migrações que transformam DADO, não estrutura.
+
+    `_MIGRATIONS` é keyed por coluna ausente (`PRAGMA table_info`), então só serve
+    para criar coluna: uma transformação ali rodaria de novo a cada `connect()`.
+    O contador é o `PRAGMA user_version` do próprio SQLite.
+    """
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if version < 1:
+        # v1: sla_days deixou de ser deslocamento e virou duração da janela,
+        # contando o dia de abertura (abre dia 1, fecha dia 5 = 5).
+        conn.execute("UPDATE routines SET sla_days = sla_days + 1")
+    if version < SCHEMA_VERSION:
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")  # não aceita bind
+        conn.commit()
 
 
 def _now() -> str:
@@ -477,6 +537,27 @@ def stage_progress(conn: sqlite3.Connection, stage_id: int) -> dict:
     return _task_counts(conn, "stage_id", stage_id)
 
 
+def stage_progress_map(conn: sqlite3.Connection, project_id: int) -> dict[int, dict]:
+    """Progresso de todas as etapas do projeto num único GROUP BY.
+
+    `stage_progress` é uma query por etapa; montar a tela inteira com ela daria
+    dezenas de consultas por request.
+    """
+    rows = conn.execute(
+        "SELECT s.id AS stage_id, COUNT(t.id) AS total,"
+        " COALESCE(SUM(t.status = 'done'), 0) AS done"
+        " FROM stages s LEFT JOIN tasks t ON t.stage_id = s.id"
+        " WHERE s.project_id = ? GROUP BY s.id",
+        (project_id,),
+    )
+    return {row["stage_id"]: {"total": row["total"], "done": row["done"]} for row in rows}
+
+
+def stage_names(conn: sqlite3.Connection) -> dict[int, str]:
+    """Nome de toda etapa, para resolver o rótulo da tarefa sem N+1."""
+    return {row["id"]: row["name"] for row in conn.execute("SELECT id, name FROM stages")}
+
+
 def list_known_tags(conn: sqlite3.Connection) -> list[str]:
     """Tags distintas já usadas, em ordem alfabética."""
     known: set[str] = set()
@@ -552,9 +633,28 @@ def set_project_deadline(
     return get_project(conn, project_id)
 
 
-def complete_project(conn: sqlite3.Connection, project_id: int) -> Project:
+def complete_project(
+    conn: sqlite3.Connection, project_id: int, closed_on: str | None = None
+) -> Project:
+    """Conclui o projeto/ciclo, gravando quando fechou.
+
+    `closed_on` (YYYY-MM-DD) permite registrar um fechamento retroativo — é o que
+    dá para corrigir à mão um ciclo que o usuário fechou fora do app.
+    """
     get_project(conn, project_id)
-    conn.execute("UPDATE projects SET status = 'done' WHERE id = ?", (project_id,))
+    when = f"{validate_date(closed_on, 'data de fechamento')}T00:00:00" if closed_on else _now()
+    conn.execute(
+        "UPDATE projects SET status = 'done', done_at = ? WHERE id = ?", (when, project_id)
+    )
+    conn.commit()
+    return get_project(conn, project_id)
+
+
+def reopen_project(conn: sqlite3.Connection, project_id: int) -> Project:
+    get_project(conn, project_id)
+    conn.execute(
+        "UPDATE projects SET status = 'active', done_at = NULL WHERE id = ?", (project_id,)
+    )
     conn.commit()
     return get_project(conn, project_id)
 
@@ -710,6 +810,75 @@ def list_checkpoints(conn: sqlite3.Connection, project_id: int) -> list[Checkpoi
     return [Checkpoint(**row) for row in rows]
 
 
+# --- Vereditos por etapa ----------------------------------------------------
+
+
+def validate_verdict(verdict: str) -> str:
+    if verdict not in VERDICT_VALUES:
+        raise ValueError(
+            f"Veredito inválido '{verdict}': use {', '.join(VERDICT_VALUES)}"
+        )
+    return verdict
+
+
+def add_checkpoint_verdicts(
+    conn: sqlite3.Connection, checkpoint_id: int, verdicts: list[dict]
+) -> list[CheckpointVerdict]:
+    """Grava o veredito do modelo para cada etapa avaliada no checkpoint.
+
+    Cada item: {"stage_id": int, "verdict": str, "rationale": str | None}.
+    """
+    row = conn.execute(
+        "SELECT project_id FROM checkpoints WHERE id = ?", (checkpoint_id,)
+    ).fetchone()
+    if row is None:
+        raise LookupError(f"Checkpoint #{checkpoint_id} não encontrado")
+    project_id = row["project_id"]
+    for item in verdicts:
+        stage = get_stage(conn, item["stage_id"])
+        if stage.project_id != project_id:
+            raise ValueError(
+                f"Etapa #{stage.id} não pertence ao projeto #{project_id}"
+            )
+        conn.execute(
+            "INSERT INTO checkpoint_verdicts (checkpoint_id, stage_id, verdict, rationale,"
+            " created_at) VALUES (?, ?, ?, ?, ?)",
+            (
+                checkpoint_id,
+                stage.id,
+                validate_verdict(item["verdict"]),
+                item.get("rationale"),
+                _now(),
+            ),
+        )
+    conn.commit()
+    return list_checkpoint_verdicts(conn, checkpoint_id)
+
+
+def list_checkpoint_verdicts(
+    conn: sqlite3.Connection, checkpoint_id: int
+) -> list[CheckpointVerdict]:
+    rows = conn.execute(
+        f"SELECT {VERDICT_COLUMNS} FROM checkpoint_verdicts WHERE checkpoint_id = ?"
+        " ORDER BY id",
+        (checkpoint_id,),
+    )
+    return [CheckpointVerdict(**row) for row in rows]
+
+
+def last_stage_verdicts(
+    conn: sqlite3.Connection, project_id: int
+) -> dict[int, CheckpointVerdict]:
+    """Veredito mais recente de cada etapa do projeto, indexado por stage_id."""
+    rows = conn.execute(
+        f"SELECT {VERDICT_COLUMNS} FROM checkpoint_verdicts"
+        " WHERE stage_id IN (SELECT id FROM stages WHERE project_id = ?) ORDER BY id",
+        (project_id,),
+    )
+    # ORDER BY id crescente + sobrescrita: sobra o último veredito de cada etapa.
+    return {row["stage_id"]: CheckpointVerdict(**row) for row in rows}
+
+
 # --- Rotinas ----------------------------------------------------------------
 
 
@@ -719,12 +888,15 @@ def add_routine(
     goal: str,
     cadence: str,
     anchor: int,
-    sla_days: int = 0,
+    sla_days: int = 1,
 ) -> Routine:
     cadence = schedule.validate_cadence(cadence)
     anchor = schedule.validate_anchor(cadence, anchor)
-    if sla_days < 0:
-        raise ValueError(f"SLA inválido '{sla_days}': use 0 ou mais dias")
+    if sla_days < 1:
+        raise ValueError(
+            f"SLA inválido '{sla_days}': a janela tem no mínimo 1 dia"
+            " (é a duração contando o dia de abertura)"
+        )
     cur = conn.execute(
         "INSERT INTO routines (name, goal, cadence, anchor, sla_days, created_at)"
         " VALUES (?, ?, ?, ?, ?, ?)",
@@ -866,6 +1038,27 @@ def find_routine_run(
         (routine_id, period),
     ).fetchone()
     return Project(**row) if row else None
+
+
+def list_routine_runs_due_between(
+    conn: sqlite3.Connection, start: str, end: str
+) -> list[Project]:
+    """Ciclos cujo prazo cai na janela — é o prazo que define o evento de SLA."""
+    rows = conn.execute(
+        f"SELECT {PROJECT_COLUMNS} FROM projects WHERE kind = 'routine_run'"
+        " AND deadline IS NOT NULL AND deadline BETWEEN ? AND ? ORDER BY deadline, id",
+        (start, end),
+    )
+    return [Project(**row) for row in rows]
+
+
+def count_stages_done_between(conn: sqlite3.Connection, start: str, end: str) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM stages WHERE status = 'done'"
+        " AND done_at IS NOT NULL AND substr(done_at, 1, 10) BETWEEN ? AND ?",
+        (start, end),
+    ).fetchone()
+    return row["n"]
 
 
 def list_routine_runs(

@@ -10,7 +10,7 @@ def conn(tmp_path):
     return db.connect(tmp_path / "test.db")
 
 
-def _janela(conn, created_at="2026-08-01", anchor=1, sla_days=4, cadence="monthly"):
+def _janela(conn, created_at="2026-08-01", anchor=1, sla_days=5, cadence="monthly"):
     """Rotina mensal com 3 passos, com created_at forçado para testar backfill."""
     routine = db.add_routine(
         conn, "Janela de Comissões", "fechar no SLA", cadence, anchor, sla_days=sla_days
@@ -43,7 +43,7 @@ def test_materializes_the_cycle_with_stages(conn):
     assert ciclo.kind == "routine_run"
     assert ciclo.period == "2026-08"
     assert ciclo.goal == routine.goal  # cópia do objetivo da rotina
-    assert ciclo.deadline == "2026-08-05"  # abertura 01/08 + sla_days 4
+    assert ciclo.deadline == "2026-08-05"  # abre 01/08, janela de 5 dias
 
     stages = db.list_stages(conn, ciclo.id)
     assert [(s.name, s.position, s.deadline) for s in stages] == [
@@ -113,7 +113,7 @@ def test_name_collision_with_a_manual_project(conn):
 
 
 def test_weekly_routine(conn):
-    _janela(conn, created_at="2026-08-01", anchor=1, sla_days=1, cadence="weekly")
+    _janela(conn, created_at="2026-08-01", anchor=1, sla_days=2, cadence="weekly")
     created = services.ensure_routines(conn, today="2026-08-12")
     # segundas de agosto a partir do dia 01: 03/08 e 10/08
     assert [p.period for p in created] == ["2026-W32", "2026-W33"]
@@ -129,7 +129,7 @@ def test_routine_view(conn):
     db.add_task(conn, "Baixar arquivo", stage_id=stages[0].id)
 
     view = services.routine_view(conn, routine)
-    assert view["cadence"] == "mensal, dia 1 (+4d)"
+    assert view["cadence"] == "mensal, dia 1 (janela 5d)"
     assert [s.name for s in view["steps"]] == ["Extrair base", "Reconciliar", "Publicar"]
     assert view["runs"][0]["stages"] == {"total": 3, "done": 1}
     assert view["runs"][0]["tasks"] == {"total": 1, "done": 0}
@@ -197,6 +197,10 @@ def test_run_checkpoint_sends_stages_and_saves_the_link(conn, monkeypatch):
             "situacao": "Reconciliação parada.",
             "riscos": "Critério de diferença não foi verificado.",
             "proximo_passo": ["Rodar o batimento"],
+            "vereditos": [
+                {"etapa": "Reconciliar", "veredito": "nao_atende",
+                 "justificativa": "batimento não foi rodado"}
+            ],
             "status": "em risco",
             "resumo": "Em risco — reconciliação sem batimento.",
         }
@@ -223,6 +227,7 @@ def test_run_checkpoint_without_stage_still_works(conn, monkeypatch):
             "situacao": "ok",
             "riscos": "nenhum",
             "proximo_passo": ["seguir"],
+            "vereditos": [],
             "status": "no rumo",
             "resumo": "No rumo.",
         },
@@ -230,3 +235,285 @@ def test_run_checkpoint_without_stage_still_works(conn, monkeypatch):
     p = db.add_project(conn, "Janela", "fechar comissões")
     services.run_checkpoint(conn, p, "tudo certo")
     assert db.list_checkpoints(conn, p.id)[0].stage_id is None
+
+
+# --- Vereditos por etapa ----------------------------------------------------
+
+
+def _mock_verdicts(monkeypatch, vereditos):
+    from work_assistant import llm
+
+    monkeypatch.setattr(
+        llm,
+        "structured",
+        lambda *a, **k: {
+            "situacao": "ok",
+            "riscos": "nenhum",
+            "proximo_passo": ["seguir"],
+            "status": "no rumo",
+            "resumo": "No rumo.",
+            "vereditos": vereditos,
+        },
+    )
+
+
+def _projeto_com_etapas(conn):
+    p = db.add_project(conn, "Janela", "fechar comissões")
+    db.add_stage(conn, p.id, "Extrair base", done_criteria="arquivo na landing")
+    db.add_stage(conn, p.id, "Reconciliar", done_criteria="diferença < 0,01%")
+    return p
+
+
+def test_verdicts_matched_by_name_case_insensitive(conn, monkeypatch):
+    p = _projeto_com_etapas(conn)
+    _mock_verdicts(monkeypatch, [
+        {"etapa": "  extrair BASE ", "veredito": "atende", "justificativa": "arquivo chegou"},
+        {"etapa": "Reconciliar", "veredito": "nao_atende", "justificativa": "sem batimento"},
+    ])
+    result = services.run_checkpoint(conn, p, "relato")
+    assert [(v["stage_name"], v["verdict"]) for v in result["verdicts"]] == [
+        ("Extrair base", "atende"),
+        ("Reconciliar", "nao_atende"),
+    ]
+    assert result["verdicts"][1]["label"] == "não atende"
+
+    cp = db.list_checkpoints(conn, p.id)[0]
+    gravados = db.list_checkpoint_verdicts(conn, cp.id)
+    assert [(v.stage_id, v.verdict) for v in gravados] == [(1, "atende"), (2, "nao_atende")]
+
+
+def test_hallucinated_stage_name_is_discarded(conn, monkeypatch):
+    """Nome que não casa com etapa nenhuma não pode virar linha no banco."""
+    p = _projeto_com_etapas(conn)
+    _mock_verdicts(monkeypatch, [
+        {"etapa": "Etapa que não existe", "veredito": "atende", "justificativa": "x"},
+    ])
+    result = services.run_checkpoint(conn, p, "relato")
+    assert all(v["verdict"] == "nao_avaliada" for v in result["verdicts"])
+    assert len(result["verdicts"]) == 2
+
+
+def test_omitted_stage_becomes_nao_avaliada(conn, monkeypatch):
+    p = _projeto_com_etapas(conn)
+    _mock_verdicts(monkeypatch, [
+        {"etapa": "Extrair base", "veredito": "atende", "justificativa": "ok"},
+    ])
+    result = services.run_checkpoint(conn, p, "relato")
+    assert [(v["stage_name"], v["verdict"]) for v in result["verdicts"]] == [
+        ("Extrair base", "atende"),
+        ("Reconciliar", "nao_avaliada"),
+    ]
+
+
+def test_project_without_stages_saves_no_verdicts(conn, monkeypatch):
+    p = db.add_project(conn, "Sem etapas", "meta")
+    _mock_verdicts(monkeypatch, [])
+    result = services.run_checkpoint(conn, p, "relato")
+    assert result["verdicts"] == []
+    cp = db.list_checkpoints(conn, p.id)[0]
+    assert db.list_checkpoint_verdicts(conn, cp.id) == []
+
+
+def test_missing_vereditos_key_does_not_break(conn, monkeypatch):
+    """Mock/modelo antigo sem a chave: o checkpoint tem que salvar mesmo assim."""
+    from work_assistant import llm
+
+    p = _projeto_com_etapas(conn)
+    monkeypatch.setattr(llm, "structured", lambda *a, **k: {
+        "situacao": "ok", "riscos": "nenhum", "proximo_passo": ["seguir"],
+        "status": "no rumo", "resumo": "No rumo.",
+    })
+    result = services.run_checkpoint(conn, p, "relato")
+    assert all(v["verdict"] == "nao_avaliada" for v in result["verdicts"])
+    assert len(db.list_checkpoints(conn, p.id)) == 1
+
+
+def test_last_stage_verdicts_keeps_the_most_recent(conn, monkeypatch):
+    p = _projeto_com_etapas(conn)
+    _mock_verdicts(monkeypatch, [
+        {"etapa": "Reconciliar", "veredito": "nao_atende", "justificativa": "primeiro"},
+    ])
+    services.run_checkpoint(conn, p, "relato 1")
+    _mock_verdicts(monkeypatch, [
+        {"etapa": "Reconciliar", "veredito": "atende", "justificativa": "segundo"},
+    ])
+    services.run_checkpoint(conn, p, "relato 2")
+
+    ultimos = db.last_stage_verdicts(conn, p.id)
+    assert ultimos[2].verdict == "atende"
+    assert ultimos[2].rationale == "segundo"
+
+
+def test_verdict_validation(conn):
+    p = _projeto_com_etapas(conn)
+    cp = db.add_checkpoint(conn, p.id, "relato", "avaliação")
+    with pytest.raises(ValueError, match="Veredito inválido"):
+        db.add_checkpoint_verdicts(conn, cp.id, [{"stage_id": 1, "verdict": "talvez"}])
+
+    outro = db.add_project(conn, "Outro", "meta")
+    etapa_alheia = db.add_stage(conn, outro.id, "De outro projeto")
+    with pytest.raises(ValueError, match="não pertence"):
+        db.add_checkpoint_verdicts(
+            conn, cp.id, [{"stage_id": etapa_alheia.id, "verdict": "atende"}]
+        )
+
+
+# --- Ritual do dia ----------------------------------------------------------
+
+
+def test_ritual_is_empty_without_anything_due(conn):
+    db.add_project(conn, "Sem prazo", "meta")  # sem deadline: não gera item
+    assert services.day_ritual(conn, today="2026-08-10") == []
+
+
+def test_ritual_flags_overdue_current_stage_as_now(conn):
+    _janela(conn)
+    services.ensure_routines(conn, today="2026-08-03")
+    item = services.day_ritual(conn, today="2026-08-10")[0]
+    assert item["level"] == "now"
+    assert item["title"] == "Janela de Comissões — 2026-08"
+    assert "Extrair base" in item["detail"]
+    assert item["action"] == "checkpoint"
+    assert item["target"].startswith("r")
+
+
+def test_ritual_flags_cycle_past_sla_as_open(conn):
+    """Todas as etapas fechadas mas o ciclo continua aberto depois do SLA."""
+    _janela(conn)
+    services.ensure_routines(conn, today="2026-08-03")
+    ciclo = db.list_projects(conn, kind="routine_run")[0]
+    for s in db.list_stages(conn, ciclo.id):
+        db.complete_stage(conn, s.id)
+
+    item = services.day_ritual(conn, today="2026-08-10")[0]
+    assert item["level"] == "open"
+    assert item["action"] == "close"
+    assert "SLA" in item["detail"]
+
+
+def test_ritual_flags_stale_project_as_calm(conn):
+    db.add_project(conn, "Migração Glue", "meta", deadline="2026-12-01")
+    itens = services.day_ritual(conn, today="2026-08-10")
+    assert [i["level"] for i in itens] == ["calm"]
+    assert itens[0]["detail"] == "nunca teve checkpoint"
+    assert itens[0]["target"].startswith("p")
+
+
+def test_ritual_ignores_project_with_recent_checkpoint(conn):
+    p = db.add_project(conn, "Migração Glue", "meta", deadline="2026-12-01")
+    cp = db.add_checkpoint(conn, p.id, "relato", "avaliação")
+    conn.execute("UPDATE checkpoints SET created_at = ? WHERE id = ?", ("2026-08-08", cp.id))
+    conn.commit()
+    assert services.day_ritual(conn, today="2026-08-10") == []
+
+
+def test_ritual_ignores_project_without_deadline(conn):
+    """Sem prazo não há urgência a alegar — é o que impede o ritual de virar ruído."""
+    db.add_project(conn, "Exploratório", "meta")
+    assert services.day_ritual(conn, today="2026-08-10") == []
+
+
+def test_ritual_orders_by_level_and_caps_at_three(conn):
+    for n in range(5):
+        db.add_project(conn, f"Projeto {n}", "meta", deadline="2026-12-01")
+    _janela(conn)
+    services.ensure_routines(conn, today="2026-08-03")
+
+    itens = services.day_ritual(conn, today="2026-08-10")
+    assert len(itens) == services.RITUAL_LIMIT
+    assert itens[0]["level"] == "now"  # o ciclo atrasado vem antes dos projetos parados
+    assert [i["level"] for i in itens[1:]] == ["calm", "calm"]
+
+
+# --- run x change -----------------------------------------------------------
+
+
+def _ciclo_de_hoje(conn):
+    """Materializa um ciclo com prazo em torno de hoje, sem fixar datas."""
+    from datetime import date
+
+    from work_assistant import schedule
+
+    hoje = date.fromisoformat(db.today())
+    routine = db.add_routine(conn, "Janela", "meta", "daily", 0, sla_days=1)
+    db.replace_routine_steps(conn, routine.id, [{"name": "Extrair", "offset_days": 0}])
+    return services.materialize_run(conn, routine, schedule.period_key("daily", hoje))
+
+
+def test_run_change_splits_by_project_kind(conn):
+    ciclo = _ciclo_de_hoje(conn)
+    projeto = db.add_project(conn, "Migração Glue", "meta")
+    for _ in range(3):
+        db.add_task(conn, "rotina", project_id=ciclo.id)
+    db.add_task(conn, "projeto", project_id=projeto.id)
+    db.add_task(conn, "solta")
+
+    rc = services.review_metrics(conn, days=1)["run_change"]
+    assert rc["run"]["total"] == 3
+    assert rc["change"]["total"] == 1
+    assert rc["loose"]["total"] == 1
+    # o balde `loose` fica fora do denominador do share
+    assert rc["attributed"] == 4
+    assert rc["run_share"] == 0.75
+    assert rc["change_share"] == 0.25
+
+
+def test_run_change_without_tasks_has_no_share(conn):
+    rc = services.review_metrics(conn, days=7)["run_change"]
+    assert rc["attributed"] == 0
+    assert rc["run_share"] is None
+    assert rc["change_share"] is None
+
+
+def test_cycles_on_sla_ignores_cycles_without_done_at(conn):
+    """Ciclo fechado sem data não conta como cumprido — sai do denominador."""
+    ciclo = _ciclo_de_hoje(conn)
+    db.complete_project(conn, ciclo.id, closed_on=ciclo.deadline)
+
+    rc = services.review_metrics(conn, days=7)["run_change"]
+    assert rc["cycles_total"] == 1
+    assert rc["cycles_closed"] == 1
+    assert rc["cycles_on_sla"] == 1
+    assert rc["cycles_unknown"] == 0
+    assert rc["cycles_sla_rate"] == 1.0
+
+    conn.execute("UPDATE projects SET done_at = NULL WHERE id = ?", (ciclo.id,))
+    conn.commit()
+    rc = services.review_metrics(conn, days=7)["run_change"]
+    assert rc["cycles_unknown"] == 1
+    assert rc["cycles_sla_rate"] is None
+
+
+def test_cycle_closed_late_is_not_on_sla(conn):
+    from datetime import date, timedelta
+
+    ciclo = _ciclo_de_hoje(conn)
+    atrasado = (date.fromisoformat(ciclo.deadline) + timedelta(days=1)).isoformat()
+    db.complete_project(conn, ciclo.id, closed_on=atrasado)
+    rc = services.review_metrics(conn, days=7)["run_change"]
+    assert rc["cycles_on_sla"] == 0
+    assert rc["cycles_sla_rate"] == 0.0
+
+
+def test_stages_done_counted_in_the_window(conn):
+    ciclo = _ciclo_de_hoje(conn)
+    db.complete_stage(conn, db.list_stages(conn, ciclo.id)[0].id)
+    assert services.review_metrics(conn, days=7)["run_change"]["stages_done"] == 1
+
+
+def test_per_day_colours_by_nature(conn):
+    ciclo = _ciclo_de_hoje(conn)
+    t = db.add_task(conn, "rotina", project_id=ciclo.id)
+    db.complete_task(conn, t.id)
+
+    ultimo = services.review_metrics(conn, days=1)["per_day"][-1]
+    assert ultimo["done"] == 1
+    assert ultimo["run"] == 1
+    assert ultimo["change"] == 0
+
+
+def test_by_project_carries_kind(conn):
+    ciclo = _ciclo_de_hoje(conn)
+    db.add_task(conn, "rotina", project_id=ciclo.id)
+    by_project = services.review_metrics(conn, days=1)["by_project"]
+    assert by_project[str(ciclo.id)]["kind"] == "routine_run"

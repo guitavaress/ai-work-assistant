@@ -65,12 +65,18 @@ def _parse_steps(text: str) -> list[dict]:
 def add(
     name: str = typer.Argument(..., help="Nome da rotina (ex.: 'Janela de Comissões')"),
     goal: str = typer.Option(..., "--goal", "-g", help="O que significa a rotina ter rodado bem"),
-    cadence: str = typer.Option("monthly", "--cadence", "-c", help="monthly ou weekly"),
+    cadence: str = typer.Option("monthly", "--cadence", "-c", help="daily, weekly ou monthly"),
     opens: int = typer.Option(
-        ..., "--opens", "-o", help="Mensal: dia do mês (-1 = último). Semanal: 1 = segunda a 7 = domingo"
+        0,
+        "--opens",
+        "-o",
+        help="Mensal: dia do mês (-1 = último). Semanal: 1 = segunda a 7 = domingo. Diária: não use",
     ),
     sla_days: int = typer.Option(
-        0, "--sla-days", "-s", help="Dias entre a abertura e o prazo (abre dia 1, SLA dia 5 = 4)"
+        1,
+        "--sla-days",
+        "-s",
+        help="Duração da janela em dias, contando o dia de abertura (abre dia 1, fecha dia 5 = 5)",
     ),
 ):
     """Cadastra uma rotina. Depois use `wa routine steps` para montar o checklist."""
@@ -238,6 +244,9 @@ def run(
 def close(
     ref: str = typer.Argument(..., help="Número ou nome da rotina"),
     period: str = typer.Option(None, "--period", "-p", help="Período; padrão: o ciclo mais recente"),
+    on: str = typer.Option(
+        None, "--on", help="Data do fechamento (YYYY-MM-DD); padrão: agora"
+    ),
 ):
     """Fecha um ciclo. É sempre manual — ver a janela aberta é o sinal que a rotina dá."""
     conn = db.connect()
@@ -254,8 +263,14 @@ def close(
     if pendentes:
         nomes = ", ".join(s.name for s in pendentes)
         console.print(f"[yellow]Etapas ainda pendentes: {nomes}[/yellow]")
-    services.close_routine_run(conn, ciclo)
-    console.print(f"[green]✔ Ciclo fechado:[/green] {ciclo.name}")
+    try:
+        ciclo = services.close_routine_run(conn, ciclo, closed_on=on)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+    dentro = ciclo.deadline and ciclo.done_at[:10] <= ciclo.deadline
+    sla = "[green]dentro do SLA[/green]" if dentro else "[yellow]fora do SLA[/yellow]"
+    console.print(f"[green]✔ Ciclo fechado:[/green] {ciclo.name} em {ciclo.done_at[:10]} — {sla}")
 
 
 @app.command("archive")

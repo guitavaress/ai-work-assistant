@@ -80,16 +80,21 @@ def deadline(
 
 
 @app.command("done")
-def done(ref: str = typer.Argument(..., help="Número ou nome do projeto")):
+def done(
+    ref: str = typer.Argument(..., help="Número ou nome do projeto"),
+    on: str = typer.Option(
+        None, "--on", help="Data do fechamento (YYYY-MM-DD); padrão: agora"
+    ),
+):
     """Marca um projeto como concluído."""
     conn = db.connect()
     try:
         project = db.find_project(conn, ref)
-        db.complete_project(conn, project.id)
-    except LookupError as e:
+        project = db.complete_project(conn, project.id, closed_on=on)
+    except (LookupError, ValueError) as e:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(1)
-    console.print(f"[green]✔ Projeto concluído:[/green] {project.name}")
+    console.print(f"[green]✔ Projeto concluído:[/green] {project.name} ({project.done_at[:10]})")
 
 
 # --- Etapas -----------------------------------------------------------------
