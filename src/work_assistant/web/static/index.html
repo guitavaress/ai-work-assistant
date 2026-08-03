@@ -16,6 +16,7 @@ body {
   --accent-soft:#EDF3EE; --accent-border:#CFE0D4; --accent-text:#2A4A3A;
   --amber:#B07A16; --amber-bg:#F5EAD0; --warn:#C2542E; --warn-bg:#F6E1D8;
   --cycle:#2F5D6B; --cycle-soft:#E8F0F2; --cycle-border:#C6DBE0; --cycle-text:#274C57;
+  --cycle-ink:#FFFFFF;
   --chip:#EFECE3; --p1bg:#F6E8DE; --p1ink:#8A4B2D; --btn:#F3F0E9;
   --ok:#3E9B6B; --overlay:rgba(20,19,16,0.45); --shadow:rgba(28,27,24,0.08);
   --pc0bg:#F6E8DE; --pc0ink:#8A4B2D; --pc1bg:#E3EDF7; --pc1ink:#2D5C8A;
@@ -28,6 +29,7 @@ body.dark {
   --accent-soft:#1E2A23; --accent-border:#2E4A3B; --accent-text:#A8D5BC;
   --amber:#D9AB4E; --amber-bg:#3A311C; --warn:#E07B52; --warn-bg:#3A2417;
   --cycle:#77B2C1; --cycle-soft:#1B2A2F; --cycle-border:#31505A; --cycle-text:#A9CFD9;
+  --cycle-ink:#10231A;
   --chip:#2A2822; --p1bg:#3A2417; --p1ink:#E5A583; --btn:#262420;
   --ok:#4FBF85; --overlay:rgba(0,0,0,0.55); --shadow:rgba(0,0,0,0.35);
   --pc0bg:#3A2417; --pc0ink:#E5A583; --pc1bg:#1E2E3D; --pc1ink:#8FBBDD;
@@ -215,6 +217,29 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .navcount { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; color: var(--cycle); background: var(--cycle-soft); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
 .sect-title { font-family: var(--font-mono); font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.6px; }
 
+/* Formulário de nova rotina */
+.nrform { background: var(--card); border: 1px solid var(--cycle-border); border-radius: 14px; padding: 22px 24px; display: flex; flex-direction: column; gap: 16px; }
+.nrgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.nrgrid3 { display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: 12px; align-items: end; }
+.nrfield { display: flex; flex-direction: column; gap: 5px; }
+.nrfield > span { font-size: 12px; color: var(--dim); }
+.nrfield input { border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 9px 11px; font-size: 14px; }
+.cadrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.cadbtn { border: 1px solid var(--border); background: var(--card); color: var(--dim); border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+.cadbtn.on { border-color: var(--cycle); background: var(--cycle); color: var(--cycle-ink); }
+.nrprev { font-family: var(--font-mono); font-size: 12px; color: var(--cycle-text); background: var(--cycle-soft); border: 1px solid var(--cycle-border); border-radius: 8px; padding: 9px 11px; }
+.nslist { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.nsrow { display: grid; grid-template-columns: 1.1fr 1.5fr 92px auto; gap: 8px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--line); }
+.nsrow input { border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; font-size: 13px; width: 100%; box-sizing: border-box; }
+.nsitem { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-top: 1px solid var(--line); }
+.nspos { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--cycle); margin-top: 2px; }
+.nsact { border: none; background: transparent; color: var(--faint); font-size: 14px; cursor: pointer; padding: 0 4px; }
+.nsact:hover { color: var(--ink); }
+.nrfoot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.nrhint { font-size: 12.5px; color: var(--dim); }
+.btn-cycle { background: var(--cycle); color: var(--cycle-ink); border: none; border-radius: 8px; padding: 9px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.btn-cycle-soft { border: 1px solid var(--cycle-border); background: var(--cycle-soft); color: var(--cycle-text); border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
 /* Projetos view */
 .stackv { display: flex; flex-direction: column; gap: 22px; }
 .pcard { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; }
@@ -360,6 +385,10 @@ const S = {
   np: { open: false, name: '', goal: '' },
   openStages: {},
   routines: [], ritual: [], counts: {},
+  // Só o que é estrutural mora aqui; o texto dos campos fica no DOM e é lido
+  // sob demanda (mesmo padrão do formulário de novo projeto). Guardar texto no
+  // estado exigiria re-render por tecla, e re-render tira o foco do input.
+  nr: { open: false, cadence: 'monthly', anchor: 1, sla: 5, stages: [], preview: '' },
   edit: { id: null, project_id: '', tags: '', due: '', effort: '' },
 };
 const OFFLINE_MSG = 'Servidor offline — suba o llama.cpp com docker compose up -d';
@@ -809,17 +838,219 @@ function cycleCard(c) {
   return html + '</div>';
 }
 
+// --- Nova rotina -----------------------------------------------------------
+// Os campos de texto vivem no DOM. Antes de qualquer re-render estrutural
+// (trocar cadência, mexer no checklist) a gente colhe os valores para o estado,
+// senão o que estava digitado some.
+
+const CADENCIAS = [['diária', 'daily'], ['semanal', 'weekly'],
+                   ['mensal', 'monthly'], ['trimestral', 'quarterly']];
+
+function nrVal(id, fallback) {
+  const el = document.getElementById(id);
+  return el ? el.value : fallback;
+}
+
+function nrHarvest() {
+  S.nr.name = nrVal('nr-name', S.nr.name || '');
+  S.nr.goal = nrVal('nr-goal', S.nr.goal || '');
+  S.nr.anchor = nrVal('nr-anchor', S.nr.anchor);
+  S.nr.sla = nrVal('nr-sla', S.nr.sla);
+  S.nr.sName = nrVal('ns-name', '');
+  S.nr.sCriteria = nrVal('ns-criteria', '');
+  S.nr.sOffset = nrVal('ns-offset', 0);
+}
+
+function toggleNr() {
+  S.nr = { open: !S.nr.open, cadence: 'monthly', anchor: 1, sla: 5, stages: [], preview: '' };
+  render();
+  if (S.nr.open) { document.getElementById('nr-name').focus(); nrLoadPreview(); }
+}
+
+function nrSetCadence(c) {
+  nrHarvest();
+  S.nr.cadence = c;
+  if (c === 'daily') S.nr.anchor = 0;
+  else if (!Number(S.nr.anchor)) S.nr.anchor = 1;
+  render();
+  nrLoadPreview();
+}
+
+function nrOnWindowChange() { nrHarvest(); render(); nrLoadPreview(); }
+
+async function nrLoadPreview() {
+  const q = '?cadence=' + S.nr.cadence + '&anchor=' + (Number(S.nr.anchor) || 0)
+    + '&sla_days=' + (Number(S.nr.sla) || 1);
+  try {
+    S.nr.preview = (await api('/api/routines/preview' + q)).window_label;
+  } catch (e) {
+    S.nr.preview = e.message;
+  }
+  const el = document.getElementById('nr-preview');
+  if (el) el.textContent = S.nr.preview;   // sem re-render: não rouba o foco
+}
+
+function nrAddStage() {
+  nrHarvest();
+  const name = (S.nr.sName || '').trim(), criteria = (S.nr.sCriteria || '').trim();
+  if (!name || !criteria) { toast('Etapa precisa de nome e critério de pronto.'); return; }
+  S.nr.stages.push({ name, done_criteria: criteria, offset_days: Number(S.nr.sOffset) || 0 });
+  S.nr.sName = ''; S.nr.sCriteria = '';
+  S.nr.sOffset = Math.min(60, (Number(S.nr.sOffset) || 0) + 1);
+  render();
+  const el = document.getElementById('ns-name');
+  if (el) el.focus();
+}
+
+function nrStageKey(e) { if (e.key === 'Enter') { e.preventDefault(); nrAddStage(); } }
+
+function nrMoveStage(i, delta) {
+  const j = i + delta;
+  if (j < 0 || j >= S.nr.stages.length) return;
+  nrHarvest();
+  const a = S.nr.stages;
+  [a[i], a[j]] = [a[j], a[i]];
+  render();
+}
+
+function nrRemoveStage(i) {
+  nrHarvest();
+  S.nr.stages.splice(i, 1);
+  render();
+}
+
+async function saveRoutine() {
+  nrHarvest();
+  const name = (S.nr.name || '').trim(), goal = (S.nr.goal || '').trim();
+  if (!name || !goal) { toast('Preencha nome e o que é fechar o ciclo.'); return; }
+  if (!S.nr.stages.length) { toast('Adicione ao menos uma etapa com critério de pronto.'); return; }
+  try {
+    await api('/api/routines', {
+      name, goal,
+      cadence: S.nr.cadence,
+      anchor: Number(S.nr.anchor) || 0,
+      sla_days: Number(S.nr.sla) || 1,
+      steps: S.nr.stages,
+    });
+    S.nr = { open: false, cadence: 'monthly', anchor: 1, sla: 5, stages: [], preview: '' };
+    await loadState();
+    toast('Rotina criada — o ciclo nasce quando a janela abrir.');
+  } catch (e) { toast(e.message); }
+}
+
+async function openCycleNow(id) {
+  try {
+    await api('/api/routines/' + id + '/run', {});
+    S.review.metrics = null;   // o ciclo entra nas métricas da Análise
+    await loadState();
+    toast('Ciclo aberto.');
+  } catch (e) { toast(e.message); }
+}
+
+function nrForm() {
+  const anchorLabel = S.nr.cadence === 'daily' ? 'abre no dia (não usado)'
+    : (S.nr.cadence === 'weekly' ? 'dia da semana (1=seg)' : 'dia de abertura');
+  const st = S.nr.stages;
+  return '<div class="nrform">'
+    + '<div><div style="font-size:17px; font-weight:600;">Nova rotina</div>'
+    + '<div class="nrhint" style="margin-top:3px;">O molde do trabalho que volta. '
+    + 'Cada período vira um ciclo, materializado quando a janela abre.</div></div>'
+
+    + '<div class="nrgrid">'
+    + '<label class="nrfield"><span>Nome da rotina</span>'
+    + '<input id="nr-name" placeholder="Ex.: Janela de Comissões" value="' + esc(S.nr.name || '') + '"></label>'
+    + '<label class="nrfield"><span>O que é fechar o ciclo</span>'
+    + '<input id="nr-goal" placeholder="Ex.: comissões conciliadas e comunicadas" value="' + esc(S.nr.goal || '') + '"></label>'
+    + '</div>'
+
+    + '<div class="nrfield"><span>Cadência</span><div class="cadrow">'
+    + CADENCIAS.map(([rot, key]) => '<button class="cadbtn' + (S.nr.cadence === key ? ' on' : '')
+        + '" onclick="nrSetCadence(\'' + key + '\')">' + rot + '</button>').join('')
+    + '</div></div>'
+
+    + '<div class="nrgrid3">'
+    + '<label class="nrfield"><span>' + anchorLabel + '</span>'
+    + '<input id="nr-anchor" type="number" min="0" max="31" value="' + esc(String(S.nr.anchor))
+    + '" onchange="nrOnWindowChange()"' + (S.nr.cadence === 'daily' ? ' disabled' : '') + '></label>'
+    + '<label class="nrfield"><span>SLA em dias</span>'
+    + '<input id="nr-sla" type="number" min="1" max="60" value="' + esc(String(S.nr.sla))
+    + '" onchange="nrOnWindowChange()"></label>'
+    + '<div class="nrfield"><span>Janela</span><div class="nrprev" id="nr-preview">' + esc(S.nr.preview || '…') + '</div></div>'
+    + '</div>'
+
+    + '<div class="nrfield"><div style="display:flex; justify-content:space-between; align-items:baseline;">'
+    + '<span>Checklist de etapas — cada uma com seu critério de pronto</span>'
+    + '<span class="pmini-prog">'
+    + (st.length ? st.length + ' etapa' + (st.length > 1 ? 's' : '') : 'nenhuma') + '</span></div>'
+    + '<div class="nslist">'
+    + (st.length ? '' : '<div class="nrhint" style="padding:14px 16px; color:var(--faint);">'
+        + 'Sem etapas ainda. Uma rotina sem etapas vira só uma lista de tarefas — o critério é o que o checkpoint julga.</div>')
+    + st.map((s, i) => '<div class="nsitem"><span class="nspos">' + (i + 1) + '.</span>'
+        + '<div style="flex:1; min-width:0;">'
+        + '<div style="display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;">'
+        + '<span style="font-size:14px; font-weight:600;">' + esc(s.name) + '</span>'
+        + '<span class="stdue">D+' + s.offset_days + '</span></div>'
+        + '<div class="scrit" style="margin-top:4px;"><span class="scrit-kick">pronto quando</span>' + esc(s.done_criteria) + '</div>'
+        + '</div>'
+        + '<div style="display:flex; gap:2px;">'
+        + '<button class="nsact" title="subir" onclick="nrMoveStage(' + i + ',-1)">↑</button>'
+        + '<button class="nsact" title="descer" onclick="nrMoveStage(' + i + ',1)">↓</button>'
+        + '<button class="nsact" title="remover" onclick="nrRemoveStage(' + i + ')">✕</button>'
+        + '</div></div>').join('')
+    + '<div class="nsrow">'
+    + '<input id="ns-name" placeholder="Nome da etapa" value="' + esc(S.nr.sName || '') + '" onkeydown="nrStageKey(event)">'
+    + '<input id="ns-criteria" placeholder="Critério de pronto (verificável)" value="' + esc(S.nr.sCriteria || '') + '" onkeydown="nrStageKey(event)">'
+    + '<input id="ns-offset" type="number" min="0" max="60" title="dias após a abertura da janela" value="'
+    + esc(String(S.nr.sOffset || 0)) + '" onkeydown="nrStageKey(event)">'
+    + '<button class="btn-cycle-soft" onclick="nrAddStage()">+</button>'
+    + '</div></div>'
+    + '<div class="pmini-prog" style="margin-top:6px;">o número é o prazo da etapa em dias após a abertura da janela</div>'
+    + '</div>'
+
+    + '<div class="nrfoot"><span class="nrhint">'
+    + (st.length
+        ? 'Ao abrir a janela, o ciclo nasce com ' + st.length + ' etapa' + (st.length > 1 ? 's' : '')
+          + ' e prazo final em D+' + ((Number(S.nr.sla) || 1) - 1) + '.'
+        : 'Adicione ao menos uma etapa com critério verificável.')
+    + '</span><div style="display:flex; gap:8px;">'
+    + '<button class="btn-plain" onclick="toggleNr()">Cancelar</button>'
+    + '<button class="btn-cycle" onclick="saveRoutine()">Criar rotina</button></div></div>'
+    + '</div>';
+}
+
+function moldCard(r) {
+  const aberto = S.routine_runs.some(c => c.routine_id === r.id && c.open);
+  const resumo = r.cadence + ' · janela ' + r.window_label + ' · SLA ' + r.sla_days + 'd'
+    + (r.steps.length ? ' · ' + r.steps.length + ' etapa' + (r.steps.length > 1 ? 's' : '') : '');
+  return '<div class="ccard done" style="display:flex; align-items:center; gap:16px; padding:16px 22px;">'
+    + '<span class="mono" style="color:var(--cycle);">⟳</span>'
+    + '<div style="flex:1; min-width:0;">'
+    + '<div style="font-size:14.5px; font-weight:600;">' + esc(r.name) + '</div>'
+    + '<div class="pmini-prog" style="margin-top:3px;">' + esc(resumo) + '</div></div>'
+    + (aberto
+      ? '<span class="sbadge" style="color:var(--cycle-text); background:var(--cycle-soft);">ciclo aberto</span>'
+      : (r.steps.length
+        ? '<button class="btn-cycle-soft" onclick="openCycleNow(' + r.id + ')">abrir ciclo agora</button>'
+        : '<span class="sbadge">sem etapas</span>'))
+    + '</div>';
+}
+
 function renderRotinas() {
   const abertos = S.routine_runs.filter(c => c.open);
   const fechados = S.routine_runs.filter(c => !c.open).slice().reverse();
   let html = '<div class="stackv">';
   html += '<div><div class="kicker" style="color:var(--cycle);">'
     + '⟳ trabalho que volta · fecha um ciclo e recomeça</div>'
-    + '<div class="h-lg">Rotinas</div></div>';
+    + '<div class="page-head" style="align-items:flex-end;">'
+    + '<div class="h-lg">Rotinas</div>'
+    + '<button class="btn-cycle-soft" onclick="toggleNr()">'
+    + (S.nr.open ? 'fechar formulário' : '+ nova rotina') + '</button></div></div>';
 
-  if (!S.routines.length) {
-    html += '<div class="empty">Nenhuma rotina cadastrada. Crie com <span class="mono">wa routine add</span> '
-      + 'e monte o checklist com <span class="mono">wa routine steps</span>.</div>';
+  if (S.nr.open) html += nrForm();
+
+  if (!S.routines.length && !S.nr.open) {
+    html += '<div class="empty">Nenhuma rotina cadastrada. Crie aqui em <span class="mono">+ nova rotina</span>, '
+      + 'ou pela CLI com <span class="mono">wa routine add</span>.</div>';
   }
 
   if (abertos.length) {
@@ -843,6 +1074,10 @@ function renderRotinas() {
         + (c.done_at ? ' · fechado em ' + fmtShort(c.done_at.slice(0, 10)) : '') + '</div></div>'
         + '<span class="' + cls + '">' + sla + '</span></div>';
     }).join('');
+  }
+  if (S.routines.length) {
+    html += '<div class="sect-title">rotinas cadastradas</div>';
+    html += S.routines.map(moldCard).join('');
   }
   html += '</div>';
   document.getElementById('view-rotinas').innerHTML = html;
