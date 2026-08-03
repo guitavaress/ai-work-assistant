@@ -4,6 +4,7 @@ Camada fina sobre `services.py` e `db.py` — nada de lógica de negócio aqui.
 Servida junto com o frontend estático (`static/index.html`) pelo uvicorn.
 """
 
+import sqlite3
 from datetime import date
 from pathlib import Path
 
@@ -55,6 +56,25 @@ class ReviewIn(BaseModel):
 class ChatIn(BaseModel):
     message: str
     history: list[dict] = []
+
+
+class RoutineStepIn(BaseModel):
+    name: str
+    done_criteria: str
+    offset_days: int = 0
+
+
+class RoutineIn(BaseModel):
+    name: str
+    goal: str
+    cadence: str = "monthly"
+    anchor: int = 1
+    sla_days: int = 1
+    steps: list[RoutineStepIn] = []
+
+
+class RoutineRunIn(BaseModel):
+    period: str | None = None
 
 
 class TaskProjectIn(BaseModel):
@@ -400,7 +420,87 @@ def add_project(body: ProjectIn):
         project = db.add_project(conn, name, goal, deadline=body.deadline or None)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=422, detail="Já existe um projeto com esse nome.")
     return _project_out(conn, project)
+
+
+@app.post("/api/routines")
+def add_routine(body: RoutineIn):
+    """Cria a rotina com o checklist inteiro, num POST só (formulário da web)."""
+    name, goal = body.name.strip(), body.goal.strip()
+    if not name or not goal:
+        raise HTTPException(
+            status_code=422, detail="Preencha nome e o que é fechar o ciclo."
+        )
+    if not body.steps:
+        raise HTTPException(
+            status_code=422, detail="Adicione ao menos uma etapa com critério de pronto."
+        )
+    steps = []
+    for step in body.steps:
+        step_name = step.name.strip()
+        criteria = (step.done_criteria or "").strip()
+        if not step_name or not criteria:
+            raise HTTPException(
+                status_code=422, detail="Etapa precisa de nome e critério de pronto."
+            )
+        steps.append(
+            {"name": step_name, "done_criteria": criteria, "offset_days": step.offset_days}
+        )
+
+    conn = db.connect()
+    try:
+        routine = db.add_routine(
+            conn, name, goal, body.cadence, body.anchor, sla_days=body.sla_days
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=422, detail="Já existe uma rotina com esse nome.")
+    db.replace_routine_steps(conn, routine.id, steps)
+    # Não materializa aqui de propósito: o ciclo nasce quando a janela abrir, e
+    # o botão "abrir ciclo agora" da aba Rotinas é a válvula para o resto.
+    return _routine_out(conn, routine, db.today())
+
+
+@app.get("/api/routines/preview")
+def routine_preview(cadence: str = "monthly", anchor: int = 1, sla_days: int = 1):
+    """Rótulo da janela para o formulário, sem precisar salvar a rotina.
+
+    É endpoint e não função JS porque `schedule.window_label` é a fonte única
+    dessa frase — a CLI e o /api/state usam a mesma. Duplicar em JS criaria
+    duas verdades para o mesmo texto.
+    """
+    try:
+        return {
+            "cadence": schedule.cadence_label(cadence),
+            "window_label": schedule.window_label(cadence, anchor, sla_days),
+            "next_open": schedule.next_open(
+                cadence, anchor, date.fromisoformat(db.today())
+            ).isoformat(),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@app.post("/api/routines/{routine_id}/run")
+def run_routine(routine_id: int, body: RoutineRunIn | None = None):
+    """Materializa o ciclo de um período — idempotente, devolve o existente."""
+    conn = db.connect()
+    try:
+        routine = db.get_routine(conn, routine_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    period = (body.period if body else None) or schedule.period_key(
+        routine.cadence, date.fromisoformat(db.today())
+    )
+    try:
+        run = services.materialize_run(conn, routine, period)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    routines = {r.id: r for r in db.list_routines(conn, include_archived=True)}
+    return _run_out(conn, run, routines, db.today())
 
 
 @app.post("/api/projects/{project_id}/done")
