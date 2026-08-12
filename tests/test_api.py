@@ -740,3 +740,49 @@ def test_run_routine_missing_404_and_bad_period_422(client):
     rotina = client.post("/api/routines", json=_ROTINA_OK).json()
     ruim = client.post(f"/api/routines/{rotina['id']}/run", json={"period": "agosto"})
     assert ruim.status_code == 422
+
+
+# --- Fechar etapa pela web ---------------------------------------------------
+
+
+def test_toggle_stage_closes_and_reopens(client, conn):
+    _, etapa = _projeto_com_etapas(conn)
+
+    fechada = client.post(f"/api/stages/{etapa.id}/toggle")
+    assert fechada.status_code == 200
+    assert fechada.json()["done"] is True
+    assert fechada.json()["done_at"]
+    assert fechada.json()["overdue"] is False  # etapa fechada não fica em atraso
+
+    reaberta = client.post(f"/api/stages/{etapa.id}/toggle").json()
+    assert reaberta["done"] is False
+    assert reaberta["done_at"] is None
+
+
+def test_toggle_stage_moves_the_current_stage_forward(client, conn):
+    projeto, etapa = _projeto_com_etapas(conn)
+
+    fechada = client.post(f"/api/stages/{etapa.id}/toggle").json()
+    assert fechada["is_current"] is False
+
+    proj = client.get("/api/state").json()["projects"][0]
+    assert proj["stages_progress"] == {"total": 3, "done": 2, "overdue": 0}
+    assert proj["current_stage_id"] != etapa.id
+    assert next(s for s in proj["stages"] if s["id"] == proj["current_stage_id"])["name"] == "Publicar"
+
+
+def test_toggle_stage_of_a_routine_cycle(client, conn):
+    """O caso real: as etapas do ciclo são o checklist da rotina."""
+    rotina = _rotina(conn)
+    ciclo = client.post(f"/api/routines/{rotina.id}/run", json={}).json()
+    primeira = ciclo["stages"][0]
+
+    assert client.post(f"/api/stages/{primeira['id']}/toggle").json()["done"] is True
+
+    depois = client.get("/api/state").json()["routine_runs"][0]
+    assert depois["stages_progress"]["done"] == 1
+    assert depois["stages"][0]["done"] is True
+
+
+def test_toggle_missing_stage_404(client):
+    assert client.post("/api/stages/999/toggle").status_code == 404
