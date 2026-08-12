@@ -181,6 +181,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .stbox { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--faint); flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--accent-ink); }
 .stbox.done { background: var(--accent); border-color: var(--accent); }
 .stbox.late { border-color: var(--warn); }
+/* O quadradinho tem 15px por desenho; o ::after estende só o alvo de clique
+   para ~29px, sem mexer no layout da linha. */
+.stbox.act { cursor: pointer; position: relative; }
+.stbox.act::after { content: ''; position: absolute; inset: -7px; }
+.stbox.act:hover { border-color: var(--accent); }
+.stbox.done.act:hover { opacity: 0.7; }
 .stname { font-size: 13.5px; }
 .strow-cur .stname { font-weight: 600; }
 .stname.done { text-decoration: line-through; color: var(--dim); }
@@ -631,8 +637,10 @@ function stageRows(e) {
     const v = s.verdict
       ? '<span class="verdict ' + (s.verdict.verdict === 'atende' ? 'ok' : (s.verdict.verdict === 'nao_atende' ? 'no' : '')) + '">' + esc(s.verdict.label) + '</span>'
       : '';
+    const dica = s.done ? 'reabrir etapa' : 'marcar etapa como concluída';
     return '<div class="strow' + (s.is_current ? ' strow-cur' : '') + '">'
-      + '<span class="' + box + '">' + (s.done ? '✓' : '') + '</span>'
+      + '<span class="' + box + ' act" title="' + dica + '"'
+      + ' onclick="event.stopPropagation(); toggleStage(' + s.id + ')">' + (s.done ? '✓' : '') + '</span>'
       + '<div style="flex:1; min-width:0;">'
       + '<div style="display:flex; flex-wrap:wrap; align-items:baseline; gap:9px;">'
       + '<span class="stname' + (s.done ? ' done' : '') + '">' + esc(s.name) + '</span>'
@@ -650,6 +658,23 @@ function stageToggle(e) {
   return '<button class="btn-link" style="margin-top:10px;" onclick="toggleStages(\'' + key + '\')">'
     + (open ? 'ocultar etapas' : 'ver as ' + e.stages.length + ' etapas') + '</button>'
     + (open ? stageRows(e) : '');
+}
+
+async function toggleStage(id) {
+  try {
+    const etapa = await api('/api/stages/' + id + '/toggle', {});
+    S.review.metrics = null;  // etapa fechada conta no run × change da Análise
+    await loadState();
+    if (!etapa.done) return;
+    // Mesmo aviso que a CLI dá no `wa project stage done`: fechar a última etapa
+    // não fecha o ciclo, e sem o empurrão o ciclo fica aberto para sempre.
+    const dono = S.projects.concat(S.routine_runs).find(e => (e.stages || []).some(s => s.id === id));
+    if (dono && dono.active && dono.stages_progress.done === dono.stages_progress.total) {
+      toast(dono.kind === 'routine_run'
+        ? 'Todas as etapas fechadas — falta fechar o ciclo.'
+        : 'Todas as etapas fechadas — falta concluir o projeto.');
+    }
+  } catch (e) { toast(e.message); }
 }
 
 function toggleStages(key) {

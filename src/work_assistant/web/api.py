@@ -503,6 +503,33 @@ def run_routine(routine_id: int, body: RoutineRunIn | None = None):
     return _run_out(conn, run, routines, db.today())
 
 
+@app.post("/api/stages/{stage_id}/toggle")
+def toggle_stage(stage_id: int):
+    """Fecha ou reabre uma etapa — é o checkbox do checklist na web.
+
+    Toggle e não `done` porque a etapa marcada por engano precisa de volta: a CLI
+    só tem `wa project stage done`, e sem isto reabrir exigiria SQL na mão.
+    """
+    conn = db.connect()
+    try:
+        stage = db.get_stage(conn, stage_id)
+        if stage.status == "done":
+            stage = db.reopen_stage(conn, stage_id)
+        else:
+            stage = db.complete_stage(conn, stage_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    stages = db.list_stages(conn, stage.project_id)
+    current = next((s for s in stages if s.status != "done"), None)
+    return _stage_out(
+        stage,
+        db.today(),
+        db.stage_progress(conn, stage.id),
+        db.last_stage_verdicts(conn, stage.project_id).get(stage.id),
+        is_current=bool(current and current.id == stage.id),
+    )
+
+
 @app.post("/api/projects/{project_id}/done")
 def finish_project(project_id: int):
     conn = db.connect()
