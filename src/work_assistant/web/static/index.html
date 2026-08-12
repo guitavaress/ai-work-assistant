@@ -965,10 +965,24 @@ async function saveRoutine() {
 
 async function openCycleNow(id) {
   try {
-    await api('/api/routines/' + id + '/run', {});
+    const ciclo = await api('/api/routines/' + id + '/run', {});
     S.review.metrics = null;   // o ciclo entra nas métricas da Análise
     await loadState();
-    toast('Ciclo aberto.');
+    // `materialize_run` é idempotente por período: se o ciclo já existia fechado,
+    // ele volta como veio. Dizer "Ciclo aberto." aí seria mentira.
+    toast(ciclo.open
+      ? 'Ciclo aberto.'
+      : 'O ' + (ciclo.period_label || 'ciclo ' + ciclo.period) + ' já existe e está fechado.');
+  } catch (e) { toast(e.message); }
+}
+
+async function reopenCycle(id) {
+  if (!confirm('Reabrir este ciclo? Ele volta a contar como aberto e sai do histórico de SLA.')) return;
+  try {
+    await api('/api/projects/' + id + '/reopen', {});
+    S.review.metrics = null;
+    await loadState();
+    toast('Ciclo reaberto.');
   } catch (e) { toast(e.message); }
 }
 
@@ -1044,19 +1058,23 @@ function nrForm() {
 }
 
 function moldCard(r) {
-  const aberto = S.routine_runs.some(c => c.routine_id === r.id && c.open);
   const resumo = r.cadence + ' · janela ' + r.window_label + ' · SLA ' + r.sla_days + 'd'
     + (r.steps.length ? ' · ' + r.steps.length + ' etapa' + (r.steps.length > 1 ? 's' : '') : '');
+  // A ação sai do ciclo do PERÍODO CORRENTE, não de "existe algum ciclo aberto":
+  // o período só comporta um ciclo, então com ele fechado não há o que abrir.
+  const cur = r.current_run;
+  let acao;
+  if (!r.steps.length) acao = '<span class="sbadge">sem etapas</span>';
+  else if (cur && cur.open) acao = '<span class="sbadge" style="color:var(--cycle-text); background:var(--cycle-soft);">ciclo aberto</span>';
+  else if (cur) acao = '<span class="sbadge">' + esc(r.current_period_label) + ' fechado</span>'
+    + '<button class="btn-cycle-soft" style="margin-left:8px;" onclick="reopenCycle(' + cur.id + ')">reabrir</button>';
+  else acao = '<button class="btn-cycle-soft" onclick="openCycleNow(' + r.id + ')">abrir ciclo agora</button>';
   return '<div class="ccard done" style="display:flex; align-items:center; gap:16px; padding:16px 22px;">'
     + '<span class="mono" style="color:var(--cycle);">⟳</span>'
     + '<div style="flex:1; min-width:0;">'
     + '<div style="font-size:14.5px; font-weight:600;">' + esc(r.name) + '</div>'
     + '<div class="pmini-prog" style="margin-top:3px;">' + esc(resumo) + '</div></div>'
-    + (aberto
-      ? '<span class="sbadge" style="color:var(--cycle-text); background:var(--cycle-soft);">ciclo aberto</span>'
-      : (r.steps.length
-        ? '<button class="btn-cycle-soft" onclick="openCycleNow(' + r.id + ')">abrir ciclo agora</button>'
-        : '<span class="sbadge">sem etapas</span>'))
+    + '<div style="display:flex; align-items:center; white-space:nowrap;">' + acao + '</div>'
     + '</div>';
 }
 

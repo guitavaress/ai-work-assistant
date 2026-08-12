@@ -238,6 +238,12 @@ def run(
     stages = db.list_stages(conn, ciclo.id)
     console.print(f"[green]Ciclo pronto:[/green] {ciclo.name} (prazo {ciclo.deadline})")
     console.print(f"[dim]{len(stages)} etapa(s).[/dim]")
+    if ciclo.status == "done":
+        # O período comporta um ciclo só: aqui devolvemos o que já existia, fechado.
+        console.print(
+            f"[yellow]Atenção: este ciclo já foi fechado em {ciclo.done_at[:10]}"
+            " — nenhum ciclo novo foi criado.[/yellow]"
+        )
 
 
 @app.command("close")

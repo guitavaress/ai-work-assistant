@@ -257,6 +257,12 @@ def _routine_out(conn, r: db.Routine, today: str) -> dict:
     runs = db.list_routine_runs(conn, r.id)
     closed = [p for p in runs if p.status == "done" and p.done_at and p.deadline]
     on_time = sum(1 for p in closed if p.done_at[:10] <= p.deadline)
+    # O ciclo do período corrente decide o que o card do molde oferece. Sem isto o
+    # front só sabe se existe ciclo ABERTO, e um ciclo fechado no mesmo período
+    # vira botão "abrir ciclo agora" que não abre nada — `materialize_run` é
+    # idempotente por período e devolve o fechado.
+    current_period = schedule.period_key(r.cadence, date.fromisoformat(today))
+    current = next((p for p in runs if p.period == current_period), None)
     return {
         "id": r.id,
         "name": r.name,
@@ -268,6 +274,11 @@ def _routine_out(conn, r: db.Routine, today: str) -> dict:
         "next_open": schedule.next_open(
             r.cadence, r.anchor, date.fromisoformat(today)
         ).isoformat(),
+        "current_period": current_period,
+        "current_period_label": schedule.period_label(r.cadence, current_period),
+        "current_run": (
+            {"id": current.id, "open": current.status == "active"} if current else None
+        ),
         "steps": [
             {
                 "position": s.position,
@@ -535,6 +546,22 @@ def finish_project(project_id: int):
     conn = db.connect()
     try:
         project = db.complete_project(conn, project_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return _project_out(conn, project)
+
+
+@app.post("/api/projects/{project_id}/reopen")
+def reopen_project(project_id: int):
+    """Reabre projeto ou ciclo fechado por engano.
+
+    Sem isto o ciclo fechado antes da hora era beco sem saída: o período já tem
+    ciclo (índice único), então `materialize_run` devolve o fechado em vez de
+    criar outro, e não havia como voltar pela web.
+    """
+    conn = db.connect()
+    try:
+        project = db.reopen_project(conn, project_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return _project_out(conn, project)

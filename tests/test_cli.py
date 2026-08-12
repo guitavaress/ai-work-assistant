@@ -353,6 +353,19 @@ def test_routine_run_materializes_a_cycle():
     assert "⟳" in runner.invoke(app, ["project", "list", "-r"]).output
 
 
+def test_routine_run_on_a_closed_period_warns_instead_of_pretending():
+    """O período comporta um ciclo só: `run` devolve o fechado, e precisa dizer isso."""
+    _janela()
+    runner.invoke(app, ["routine", "step", "Janela de Comissões", "Extrair base"])
+    runner.invoke(app, ["routine", "run", "Janela de Comissões", "-p", "2026-08"])
+    runner.invoke(app, ["routine", "close", "Janela de Comissões"])
+
+    result = runner.invoke(app, ["routine", "run", "Janela de Comissões", "-p", "2026-08"])
+    assert result.exit_code == 0
+    assert "já foi fechado" in result.output
+    assert "nenhum ciclo novo foi criado" in result.output
+
+
 def test_routine_run_invalid_period():
     _janela()
     result = runner.invoke(app, ["routine", "run", "Janela de Comissões", "-p", "agosto"])

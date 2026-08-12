@@ -786,3 +786,74 @@ def test_toggle_stage_of_a_routine_cycle(client, conn):
 
 def test_toggle_missing_stage_404(client):
     assert client.post("/api/stages/999/toggle").status_code == 404
+
+
+# --- Ciclo fechado no período corrente ---------------------------------------
+
+
+def test_routine_exposes_the_current_period_cycle(client, conn):
+    """Sem isto o front só enxerga "existe ciclo aberto" e oferece abrir um que
+    `materialize_run` não cria — o período comporta um ciclo só."""
+    periodo = db.today()[:7]
+    # Criada hoje: `ensure_routines` não retroage antes do created_at, então o
+    # período corrente ainda está sem ciclo — é o estado que oferece "abrir agora".
+    rotina = client.post("/api/routines", json=_ROTINA_OK).json()
+    molde = client.get("/api/state").json()["routines"][0]
+    assert molde["current_period"] == periodo
+    assert molde["current_period_label"] == f"ciclo {periodo}"
+    assert molde["current_run"] is None
+
+    ciclo = client.post(f"/api/routines/{rotina['id']}/run", json={}).json()
+    molde = client.get("/api/state").json()["routines"][0]
+    assert molde["current_run"] == {"id": ciclo["id"], "open": True}
+
+    client.post(f"/api/projects/{ciclo['id']}/done")
+    molde = client.get("/api/state").json()["routines"][0]
+    assert molde["current_run"] == {"id": ciclo["id"], "open": False}
+
+
+def test_run_routine_on_a_closed_period_returns_it_closed(client, conn):
+    """O endpoint é idempotente por período: devolve o fechado em vez de criar outro."""
+    rotina = _rotina(conn)
+    ciclo = client.post(f"/api/routines/{rotina.id}/run", json={}).json()
+    client.post(f"/api/projects/{ciclo['id']}/done")
+
+    de_novo = client.post(f"/api/routines/{rotina.id}/run", json={})
+    assert de_novo.status_code == 200
+    assert de_novo.json()["id"] == ciclo["id"]
+    assert de_novo.json()["open"] is False
+    assert len(db.list_projects(conn, kind="routine_run", include_done=True)) == 1
+
+
+def test_reopen_cycle_restores_it_without_touching_the_stages(client, conn):
+    rotina = _rotina(conn)
+    ciclo = client.post(f"/api/routines/{rotina.id}/run", json={}).json()
+    client.post(f"/api/stages/{ciclo['stages'][0]['id']}/toggle")
+    client.post(f"/api/projects/{ciclo['id']}/done")
+
+    reaberto = client.post(f"/api/projects/{ciclo['id']}/reopen")
+    assert reaberto.status_code == 200
+    assert reaberto.json()["active"] is True
+    assert reaberto.json()["done_at"] is None
+    assert reaberto.json()["stages_progress"]["done"] == 1  # etapa fechada continua
+
+    estado = client.get("/api/state").json()
+    assert estado["routine_runs"][0]["open"] is True
+    assert estado["routines"][0]["sla_history"]["closed"] == 0  # saiu do denominador
+
+
+def test_reopen_missing_project_404(client):
+    assert client.post("/api/projects/999/reopen").status_code == 404
+
+
+def test_closing_a_cycle_does_not_block_the_next_period(client, conn):
+    rotina = _rotina(conn)
+    atual = client.post(f"/api/routines/{rotina.id}/run", json={}).json()
+    client.post(f"/api/projects/{atual['id']}/done")
+
+    ano, mes = int(db.today()[:4]), int(db.today()[5:7])
+    proximo = f"{ano + 1:04d}-{mes:02d}"
+    novo = client.post(f"/api/routines/{rotina.id}/run", json={"period": proximo}).json()
+    assert novo["id"] != atual["id"]
+    assert novo["open"] is True
+    assert len(novo["stages"]) == 2
